@@ -1,4 +1,7 @@
-from datetime import datetime
+import os
+import asyncio
+import logging
+from datetime import datetime, timedelta
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
@@ -9,21 +12,59 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import STATIC_DIR, CURRENCY_SYMBOL
 from app.database import (
     get_all_products, get_product_by_asin,
-    get_price_history_for_asin, get_product_statistics
+    get_price_history_for_asin, get_all_price_history, get_product_statistics
 )
 from app.history_engine import seed_database_if_empty, get_22_month_labels
 from app.scraper import scrape_asin_details, scrape_all_asins
 from app.excel_exporter import export_excel_to_file, export_excel_to_bytes
 
+logger = logging.getLogger("tracker_app")
+
+# Automated Daily Crawl Schedule (Default: 10:00 AM)
+DAILY_SCHEDULE_HOUR = int(os.getenv("DAILY_SCHEDULE_HOUR", 10))
+DAILY_SCHEDULE_MINUTE = int(os.getenv("DAILY_SCHEDULE_MINUTE", 0))
+
+async def daily_10am_scheduler_loop():
+    """
+    Background worker that runs automatically every day at 10:00 AM to crawl
+    all 25 Acer products and pre-generate the fresh daily 22-Month Excel report.
+    """
+    logger.info(f"Daily automated scheduler initialized: target daily sync at {DAILY_SCHEDULE_HOUR:02d}:{DAILY_SCHEDULE_MINUTE:02d}.")
+    while True:
+        try:
+            now = datetime.now()
+            target_time = now.replace(hour=DAILY_SCHEDULE_HOUR, minute=DAILY_SCHEDULE_MINUTE, second=0, microsecond=0)
+            if target_time <= now:
+                target_time += timedelta(days=1)
+                
+            delay_seconds = (target_time - now).total_seconds()
+            logger.info(f"Daily scheduler: next automated run at {target_time.strftime('%Y-%m-%d %H:%M:%S')} (in {int(delay_seconds//60)} minutes).")
+            
+            await asyncio.sleep(delay_seconds)
+            
+            logger.info("Executing scheduled 10:00 AM daily Amazon crawl & Excel generation...")
+            # Run in thread pool to not block asyncio event loop
+            await asyncio.to_thread(scrape_all_asins)
+            await asyncio.to_thread(export_excel_to_file)
+            logger.info("Scheduled 10:00 AM daily crawl & Excel generation completed successfully.")
+            
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in daily scheduler: {e}")
+            await asyncio.sleep(60)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Ensure database schema is initialized and 25 Acer ASINs are seeded on startup."""
+    """Initializes database on startup and starts the 10:00 AM daily background worker."""
     seed_database_if_empty()
+    scheduler_task = asyncio.create_task(daily_10am_scheduler_loop())
     yield
+    scheduler_task.cancel()
 
 app = FastAPI(
     title="Acer Amazon Price Tracker & Intelligence API",
-    description="Automated price tracking, 22-month historical analysis, and Excel exports for 25 Acer Amazon products.",
+    description="Automated price tracking, 22-month historical analysis, daily 10 AM sync, and Excel exports for 25 Acer Amazon products.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -41,7 +82,7 @@ app.add_middleware(
 @app.middleware("http")
 async def add_no_cache_headers(request, call_next):
     response = await call_next(request)
-    # Prevent aggressive localhost and CDN caching for dynamic assets
+    # Prevent aggressive browser/CDN caching for dynamic dashboard assets
     if request.url.path.startswith("/js") or request.url.path.startswith("/css") or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
@@ -50,12 +91,30 @@ async def add_no_cache_headers(request, call_next):
 
 @app.on_event("startup")
 def on_startup():
-    """Fallback startup event for legacy ASGI runners."""
+    """Fallback startup event for legacy ASGI workers."""
     seed_database_if_empty()
 
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/api/scheduler/status")
+def scheduler_status():
+    """Returns status and next execution time of the automated daily 10:00 AM sync."""
+    now = datetime.now()
+    target_time = now.replace(hour=DAILY_SCHEDULE_HOUR, minute=DAILY_SCHEDULE_MINUTE, second=0, microsecond=0)
+    if target_time <= now:
+        target_time += timedelta(days=1)
+    diff = target_time - now
+    hours, remainder = divmod(int(diff.total_seconds()), 3600)
+    minutes, _ = divmod(remainder, 60)
+    
+    return {
+        "daily_schedule": f"Every day at {DAILY_SCHEDULE_HOUR:02d}:{DAILY_SCHEDULE_MINUTE:02d}",
+        "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "time_remaining": f"{hours}h {minutes}m",
+        "excel_auto_updates": True
+    }
 
 @app.get("/api/products")
 def list_products(category: Optional[str] = None, search: Optional[str] = None):
@@ -107,7 +166,7 @@ def get_product_details(asin: str):
 
 @app.get("/api/stats")
 def get_portfolio_stats():
-    """Calculates overall statistics and KPI aggregations across all tracked products."""
+    """Calculates overall statistics and KPI aggregations across all tracked products with high-speed in-memory indexing."""
     products = get_all_products()
     if not products:
         seed_database_if_empty()
@@ -123,56 +182,66 @@ def get_portfolio_stats():
     in_stock_count = sum(1 for p in products if "in stock" in p["stock_status"].lower())
     out_of_stock_count = total_products - in_stock_count
     
+    # Fetch all history in 1 single fast query
+    all_history = get_all_price_history()
+    history_by_asin = {}
+    for h in all_history:
+        history_by_asin.setdefault(h["asin"], []).append(h)
+    
     atl_deals_count = 0
     near_atl_count = 0
     price_drops = []
-    
     category_breakdown = {}
+    
     for p in products:
+        asin = p["asin"]
         cat = p["category"]
+        curr_price = p["current_price"]
         category_breakdown[cat] = category_breakdown.get(cat, 0) + 1
         
-        stats = get_product_statistics(p["asin"])
-        if stats.get("is_atl"):
-            atl_deals_count += 1
-        elif stats.get("is_near_atl"):
-            near_atl_count += 1
-            
-        # 30-day price comparison (diff from previous month)
-        hist = get_price_history_for_asin(p["asin"])
-        if len(hist) >= 2:
-            prev_price = hist[-2]["price"]
-            curr_price = p["current_price"]
-            drop_amount = prev_price - curr_price
-            drop_pct = round((drop_amount / prev_price) * 100, 1) if prev_price > 0 else 0
-            if drop_amount > 0:
-                price_drops.append({
-                    "asin": p["asin"],
-                    "title": p["title"],
-                    "category": p["category"],
-                    "previous_price": prev_price,
-                    "current_price": curr_price,
-                    "drop_amount": round(drop_amount, 2),
-                    "drop_pct": drop_pct
-                })
+        hist = history_by_asin.get(asin, [])
+        if hist:
+            prices = [h["price"] for h in hist]
+            min_p = min(prices)
+            if curr_price <= (min_p * 1.01):
+                atl_deals_count += 1
+            elif curr_price <= (min_p * 1.05):
+                near_atl_count += 1
+                
+            # 30-day price drop comparison
+            if len(hist) >= 2:
+                prev_price = hist[-2]["price"]
+                drop_amount = prev_price - curr_price
+                drop_pct = round((drop_amount / prev_price) * 100, 1) if prev_price > 0 else 0
+                if drop_amount > 0:
+                    price_drops.append({
+                        "asin": asin,
+                        "title": p["title"],
+                        "category": cat,
+                        "previous_price": prev_price,
+                        "current_price": curr_price,
+                        "drop_amount": round(drop_amount, 2),
+                        "drop_pct": drop_pct
+                    })
 
     price_drops.sort(key=lambda x: x["drop_pct"], reverse=True)
     top_drop = price_drops[0] if price_drops else None
 
-    # Category monthly trend series
+    # Ultra-fast category monthly trends
     month_labels = get_22_month_labels()
     category_trends = {}
+    cat_month_map = {}
+    for p in products:
+        asin = p["asin"]
+        cat = p["category"]
+        hist = history_by_asin.get(asin, [])
+        for h in hist:
+            cat_month_map.setdefault((cat, h["month_label"]), []).append(h["price"])
+
     for cat in category_breakdown.keys():
-        cat_asins = [p["asin"] for p in products if p["category"] == cat]
         monthly_avgs = []
         for m in month_labels:
-            prices = []
-            for asin in cat_asins:
-                hist = get_price_history_for_asin(asin)
-                for h in hist:
-                    if h["month_label"] == m:
-                        prices.append(h["price"])
-                        break
+            prices = cat_month_map.get((cat, m), [])
             avg_p = (sum(prices) / len(prices)) if prices else 0
             monthly_avgs.append(round(avg_p, 2))
         category_trends[cat] = monthly_avgs
