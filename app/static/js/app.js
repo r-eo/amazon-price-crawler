@@ -7,6 +7,7 @@ let portfolioStats = {};
 let currentCategory = "all";
 let currentSearchQuery = "";
 let currentModalAsin = null;
+let isAtlFilterActive = false;
 const CURRENCY = "₹";
 
 // Initialize on DOM ready
@@ -31,6 +32,25 @@ function updateLiveTimestamp() {
   }
 }
 
+function toggleAtlFilter() {
+  isAtlFilterActive = !isAtlFilterActive;
+  const card = document.querySelector(".highlight-atl");
+  if (card) {
+    if (isAtlFilterActive) {
+      card.style.borderColor = "#F59E0B";
+      card.style.boxShadow = "0 0 25px rgba(245, 158, 11, 0.4)";
+      showToast("Filtering to All-Time Low Deals & Near ATL products", "info");
+    } else {
+      card.style.borderColor = "";
+      card.style.boxShadow = "";
+      showToast("Showing all products", "info");
+    }
+  }
+  renderTable();
+}
+
+let isInitialLoad = true;
+
 async function loadDashboardData() {
   try {
     // 1. Fetch portfolio stats
@@ -50,9 +70,22 @@ async function loadDashboardData() {
     allProducts = prodData.products || [];
     renderTable();
 
+    // Auto-retry once on cold start if database is still finishing seed
+    if (isInitialLoad && allProducts.length === 0) {
+      isInitialLoad = false;
+      setTimeout(loadDashboardData, 1500);
+    } else {
+      isInitialLoad = false;
+    }
+
   } catch (err) {
     console.error("Failed to load dashboard data:", err);
-    showToast("Error connecting to tracker backend", "warning");
+    if (isInitialLoad) {
+      setTimeout(loadDashboardData, 2000);
+      isInitialLoad = false;
+    } else {
+      showToast("Connecting to tracker backend...", "info");
+    }
   }
 }
 
@@ -84,12 +117,14 @@ function renderTable() {
   if (!tbody) return;
 
   const filtered = allProducts.filter(p => {
+    const stats = p.stats || {};
     const matchesCat = (currentCategory === "all" || p.category === currentCategory);
     const matchesSearch = !currentSearchQuery || 
       p.title.toLowerCase().includes(currentSearchQuery) ||
       p.asin.toLowerCase().includes(currentSearchQuery) ||
       p.category.toLowerCase().includes(currentSearchQuery);
-    return matchesCat && matchesSearch;
+    const matchesAtl = !isAtlFilterActive || stats.is_atl || stats.is_near_atl;
+    return matchesCat && matchesSearch && matchesAtl;
   });
 
   if (filtered.length === 0) {

@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,10 +15,17 @@ from app.history_engine import seed_database_if_empty, get_22_month_labels
 from app.scraper import scrape_asin_details, scrape_all_asins
 from app.excel_exporter import export_excel_to_file, export_excel_to_bytes
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Ensure database schema is initialized and 25 Acer ASINs are seeded on startup."""
+    seed_database_if_empty()
+    yield
+
 app = FastAPI(
     title="Acer Amazon Price Tracker & Intelligence API",
     description="Automated price tracking, 22-month historical analysis, and Excel exports for 25 Acer Amazon products.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS with exposed headers for download filenames
@@ -33,7 +41,7 @@ app.add_middleware(
 @app.middleware("http")
 async def add_no_cache_headers(request, call_next):
     response = await call_next(request)
-    # Prevent aggressive Chrome localhost asset caching
+    # Prevent aggressive localhost and CDN caching for dynamic assets
     if request.url.path.startswith("/js") or request.url.path.startswith("/css") or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
@@ -42,7 +50,7 @@ async def add_no_cache_headers(request, call_next):
 
 @app.on_event("startup")
 def on_startup():
-    """Initialize database and seed 25 Acer ASINs on server startup."""
+    """Fallback startup event for legacy ASGI runners."""
     seed_database_if_empty()
 
 @app.get("/api/health")
@@ -53,8 +61,11 @@ def health_check():
 def list_products(category: Optional[str] = None, search: Optional[str] = None):
     """Returns list of tracked products with current stats and price metrics."""
     products = get_all_products()
+    if not products:
+        seed_database_if_empty()
+        products = get_all_products()
+
     results = []
-    
     for p in products:
         if category and p["category"].lower() != category.lower():
             continue
@@ -79,6 +90,9 @@ def get_product_details(asin: str):
     """Returns single product details, statistics, and full 22-month timeline."""
     product = get_product_by_asin(asin)
     if not product:
+        seed_database_if_empty()
+        product = get_product_by_asin(asin)
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
         
     history = get_price_history_for_asin(asin)
@@ -95,6 +109,9 @@ def get_product_details(asin: str):
 def get_portfolio_stats():
     """Calculates overall statistics and KPI aggregations across all tracked products."""
     products = get_all_products()
+    if not products:
+        seed_database_if_empty()
+        products = get_all_products()
     if not products:
         return {}
         

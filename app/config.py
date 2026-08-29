@@ -3,15 +3,23 @@ from pathlib import Path
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-EXPORTS_DIR = BASE_DIR / "exports"
-STATIC_DIR = BASE_DIR / "app" / "static"
+
+# Check if running in Vercel Serverless environment
+IS_VERCEL = os.getenv("VERCEL") == "1" or os.getenv("NOW_REGION") is not None
+
+if IS_VERCEL:
+    DATA_DIR = Path("/tmp/data")
+    EXPORTS_DIR = Path("/tmp/exports")
+else:
+    DATA_DIR = BASE_DIR / "data"
+    EXPORTS_DIR = BASE_DIR / "exports"
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database
 DATABASE_PATH = str(DATA_DIR / "tracker.db")
+STATIC_DIR = BASE_DIR / "app" / "static"
 
 # Scraper Settings
 DEFAULT_REGION = os.getenv("AMAZON_REGION", "in")  # 'in' for amazon.in, 'com' for amazon.com

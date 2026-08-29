@@ -296,8 +296,31 @@ h1, h2, h3, h4, .kpi-value, .brand-text h1 {
 }
 
 .highlight-atl {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), rgba(18, 26, 43, 0.85));
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), rgba(18, 26, 43, 0.9));
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.highlight-atl:hover {
+  transform: translateY(-5px) scale(1.02);
+  border-color: #F59E0B !important;
+  background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.32), rgba(24, 34, 56, 0.98)) !important;
+  box-shadow: 0 12px 35px rgba(245, 158, 11, 0.35), 0 0 20px rgba(245, 158, 11, 0.25) !important;
+}
+
+.highlight-atl:hover .icon-gold {
+  background: rgba(245, 158, 11, 0.35);
+  color: #FDE68A;
+  transform: scale(1.15) rotate(8deg);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+}
+
+.highlight-atl .icon-gold {
+  transition: all 0.3s ease;
 }
 
 /* Color Helpers */
@@ -599,9 +622,26 @@ h1, h2, h3, h4, .kpi-value, .brand-text h1 {
   color: #34D399;
 }
 .atl-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 10px;
   font-weight: 700;
   color: #FBBF24;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  margin-top: 3px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.atl-indicator:hover {
+  background: rgba(245, 158, 11, 0.3);
+  border-color: #F59E0B;
+  color: #FFFBEB;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+  transform: scale(1.06);
 }
 
 .stock-badge {
