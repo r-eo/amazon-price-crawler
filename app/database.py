@@ -1,0 +1,186 @@
+import sqlite3
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from app.config import DATABASE_PATH
+
+def get_db_connection() -> sqlite3.Connection:
+    """Returns a SQLite connection with row factory enabled."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    """Initializes the database schema if tables do not exist."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Products table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                asin TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                category TEXT NOT NULL,
+                mrp REAL NOT NULL,
+                current_price REAL NOT NULL,
+                currency TEXT DEFAULT 'INR',
+                stock_status TEXT DEFAULT 'In Stock',
+                rating REAL DEFAULT 4.2,
+                review_count INTEGER DEFAULT 100,
+                image_url TEXT,
+                url TEXT NOT NULL,
+                last_scraped_at TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Price history table (contains 22-month timeline and live scrapes)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asin TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                month_label TEXT NOT NULL,
+                price REAL NOT NULL,
+                is_sale INTEGER DEFAULT 0,
+                sale_tag TEXT,
+                source TEXT DEFAULT 'history_engine',
+                FOREIGN KEY (asin) REFERENCES products(asin) ON DELETE CASCADE
+            )
+        """)
+        
+        # Index on asin and timestamp for fast lookups
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_asin ON price_history(asin)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON price_history(timestamp)")
+        
+        conn.commit()
+
+def upsert_product(product_data: Dict[str, Any]):
+    """Inserts or updates a product record."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO products (
+                asin, title, category, mrp, current_price, currency,
+                stock_status, rating, review_count, image_url, url, last_scraped_at
+            ) VALUES (
+                :asin, :title, :category, :mrp, :current_price, :currency,
+                :stock_status, :rating, :review_count, :image_url, :url, :last_scraped_at
+            ) ON CONFLICT(asin) DO UPDATE SET
+                title = excluded.title,
+                category = excluded.category,
+                mrp = excluded.mrp,
+                current_price = excluded.current_price,
+                stock_status = excluded.stock_status,
+                rating = excluded.rating,
+                review_count = excluded.review_count,
+                image_url = excluded.image_url,
+                url = excluded.url,
+                last_scraped_at = excluded.last_scraped_at
+        """, product_data)
+        conn.commit()
+
+def add_price_history_batch(records: List[Dict[str, Any]]):
+    """Batch inserts price history records."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.executemany("""
+            INSERT INTO price_history (
+                asin, timestamp, month_label, price, is_sale, sale_tag, source
+            ) VALUES (
+                :asin, :timestamp, :month_label, :price, :is_sale, :sale_tag, :source
+            )
+        """, records)
+        conn.commit()
+
+def clear_all_products_and_history():
+    """Clears all products and price history for a clean database reseed."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_history")
+        cursor.execute("DELETE FROM products")
+        conn.commit()
+
+def get_all_products() -> List[Dict[str, Any]]:
+    """Fetches all products ordered by category and title."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM products ORDER BY category, title")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+def get_product_by_asin(asin: str) -> Optional[Dict[str, Any]]:
+    """Fetches a single product by ASIN."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM products WHERE asin = ?", (asin,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+def get_price_history_for_asin(asin: str) -> List[Dict[str, Any]]:
+    """Fetches full chronological price history for an ASIN."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM price_history 
+            WHERE asin = ? 
+            ORDER BY timestamp ASC
+        """, (asin,))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+def get_all_price_history() -> List[Dict[str, Any]]:
+    """Fetches all price history records."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM price_history ORDER BY asin, timestamp ASC")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+def get_product_statistics(asin: str) -> Dict[str, Any]:
+    """Calculates min, max, avg, and deal status for an ASIN."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                MIN(price) as min_price,
+                MAX(price) as max_price,
+                AVG(price) as avg_price,
+                COUNT(id) as total_points
+            FROM price_history 
+            WHERE asin = ?
+        """, (asin,))
+        stat = cursor.fetchone()
+        
+        cursor.execute("SELECT mrp, current_price FROM products WHERE asin = ?", (asin,))
+        prod = cursor.fetchone()
+        
+        if not prod or not stat or stat["min_price"] is None:
+            return {}
+        
+        current_price = prod["current_price"]
+        mrp = prod["mrp"]
+        min_price = stat["min_price"]
+        max_price = stat["max_price"]
+        avg_price = round(stat["avg_price"], 2)
+        
+        discount_from_mrp = round(((mrp - current_price) / mrp) * 100, 1) if mrp > 0 else 0
+        discount_from_ath = round(((max_price - current_price) / max_price) * 100, 1) if max_price > 0 else 0
+        diff_from_atl = round(((current_price - min_price) / min_price) * 100, 1) if min_price > 0 else 0
+        
+        is_atl = current_price <= (min_price * 1.01) # within 1% of all-time low
+        is_near_atl = current_price <= (min_price * 1.05) # within 5% of ATL
+        
+        return {
+            "asin": asin,
+            "current_price": current_price,
+            "mrp": mrp,
+            "min_price": min_price,
+            "max_price": max_price,
+            "avg_price": avg_price,
+            "total_points": stat["total_points"],
+            "discount_from_mrp": discount_from_mrp,
+            "discount_from_ath": discount_from_ath,
+            "diff_from_atl": diff_from_atl,
+            "is_atl": is_atl,
+            "is_near_atl": is_near_atl,
+        }

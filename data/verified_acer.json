@@ -1,0 +1,252 @@
+[
+  {
+    "asin": "B0CQP1T2VW",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 98990.0,
+    "base_price": 90000.0,
+    "rating": 4.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/617LlEbpkTL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FPQ7YC8D",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 112990.0,
+    "base_price": 105000.0,
+    "rating": 4.3,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71l3rBy8IPL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0H6J2QR44",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 167990.0,
+    "base_price": 81990.0,
+    "rating": 5.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/7164hQOfDuL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0GMRBPN88",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 149990.0,
+    "base_price": 87999.0,
+    "rating": 3.5,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/7164hQOfDuL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FK8QVFJ5",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 149990.0,
+    "base_price": 148990.0,
+    "rating": 3.3,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/51WgXPBL4nL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FGQTF1GN",
+    "title": "Acer",
+    "category": "Gaming Laptops",
+    "mrp": 235000.0,
+    "base_price": 201000.0,
+    "rating": 4.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/51S7YnmsUnL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FF4QBNWM",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 44990.0,
+    "base_price": 39890.0,
+    "rating": 3.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/61+6C077NmL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0GYRK1RZC",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 71999.0,
+    "base_price": 38990.0,
+    "rating": 3.5,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71MbIVSIhAL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0HGGHQB3Q",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 41999.0,
+    "base_price": 33990.0,
+    "rating": 4.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/51RWVk6EnuL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0G8YPTR6F",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 74999.0,
+    "base_price": 39990.0,
+    "rating": 5.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/61Y8j1QN5YL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0HDCGBMFQ",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 60990.0,
+    "base_price": 40899.0,
+    "rating": 4.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/61bLnWTpcsL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0H45YFPJT",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 84999.0,
+    "base_price": 44990.0,
+    "rating": 3.8,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71EiFZ4uOpL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FJ2KGQN3",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 94999.0,
+    "base_price": 62990.0,
+    "rating": 3.8,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81Ks6doLmYL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0GW8KXZMF",
+    "title": "Acer",
+    "category": "Everyday Laptops",
+    "mrp": 55999.0,
+    "base_price": 35990.0,
+    "rating": 2.4,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81BEfyD0qeL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0DWTGH28J",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 17999.0,
+    "base_price": 14027.0,
+    "rating": 3.6,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81X69-Qo6yL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B083BVXY36",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 25999.0,
+    "base_price": 15999.0,
+    "rating": 4.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81oAY1EIruL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B09R1QVPQL",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 14999.0,
+    "base_price": 11998.0,
+    "rating": 4.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81NwUyECc6L._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0DZHY5N59",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 12999.0,
+    "base_price": 9499.0,
+    "rating": 4.3,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/91YcMJQSQvL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0D3VF2LTF",
+    "title": "acer Nitro XV272U F3 27 inch IPS WQHD 2560x1440 Gaming Backlight LED LCD Monitor I Rapid 300Hz Refresh, 0.5ms Response I HDR 400 I AMD FreeSync Premium I Zero Bright Dot Policy I Ergostand I Eye Care",
+    "category": "Monitors",
+    "mrp": 32999.0,
+    "base_price": 21599.0,
+    "rating": 4.3,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/718ToVLGo8L._AC_UL320_.jpg"
+  },
+  {
+    "asin": "B07FRQC89V",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 23000.0,
+    "base_price": 12996.0,
+    "rating": 4.1,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/7125bziGjHL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0DH2Y8MJK",
+    "title": "Acer",
+    "category": "Monitors",
+    "mrp": 26999.0,
+    "base_price": 19999.0,
+    "rating": 3.8,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/81YjdzxFSOL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FN86K6FZ",
+    "title": "Acer",
+    "category": "Desktops & AIO",
+    "mrp": 129999.0,
+    "base_price": 99946.0,
+    "rating": 5.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71LpxrPLIFL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0FPSH3N5S",
+    "title": "Acer",
+    "category": "Desktops & AIO",
+    "mrp": 135000.0,
+    "base_price": 90250.0,
+    "rating": 5.0,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71e4UXTHRyL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B0DKJQ7962",
+    "title": "Acer",
+    "category": "Desktops & AIO",
+    "mrp": 120000.0,
+    "base_price": 89900.0,
+    "rating": 4.1,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/51xtNn7DhIL._AC_UY218_.jpg"
+  },
+  {
+    "asin": "B09HMQ1HHK",
+    "title": "Acer",
+    "category": "Desktops & AIO",
+    "mrp": 35644.0,
+    "base_price": 26403.0,
+    "rating": 4.2,
+    "review_count": 1200,
+    "image_url": "https://m.media-amazon.com/images/I/71OBMkT5biL._AC_UY218_.jpg"
+  }
+]

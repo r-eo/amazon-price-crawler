@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acer Amazon Price Intelligence & 22-Month Analytics</title>
+  <meta name="description" content="Track Acer Amazon product prices, 22-month historical price fluctuations, deal alerts, and download formatted Excel intelligence reports.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/css/style.css?v=1.0.2">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+      <div class="brand-container">
+        <div class="brand-icon">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div class="brand-text">
+          <h1>ACER <span>PRICE INTELLIGENCE</span></h1>
+          <p class="subtitle">Amazon Real-Time Tracker & 22-Month Historical Matrix</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <div class="live-status-pill">
+          <span class="pulse-dot"></span>
+          <span id="lastUpdatedText">Live Sync Ready</span>
+        </div>
+
+        <button id="btnRunScrape" class="btn btn-secondary" onclick="triggerScrapeAll()">
+          <i class="fa-solid fa-rotate"></i>
+          <span>Live Scrape All</span>
+        </button>
+
+        <a href="/api/export/excel" id="btnDownloadExcel" class="btn btn-excel" download="Acer_Amazon_Price_Tracker_22Months.xlsx" onclick="downloadExcelReport(event)">
+          <i class="fa-solid fa-file-excel"></i>
+          <span>Download 22-Mo Excel (.xlsx)</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Key Performance Indicators (KPI Cards) -->
+      <section class="kpi-grid">
+        <div class="kpi-card glass-card">
+          <div class="kpi-icon icon-blue">
+            <i class="fa-solid fa-laptop-code"></i>
+          </div>
+          <div class="kpi-details">
+            <span class="kpi-label">Tracked Acer Products</span>
+            <div class="kpi-value" id="kpiTotalProducts">25</div>
+            <span class="kpi-subtext">5 Major Product Categories</span>
+          </div>
+        </div>
+
+        <div class="kpi-card glass-card">
+          <div class="kpi-icon icon-emerald">
+            <i class="fa-solid fa-tags"></i>
+          </div>
+          <div class="kpi-details">
+            <span class="kpi-label">Avg Portfolio Discount</span>
+            <div class="kpi-value text-emerald" id="kpiAvgDiscount">--%</div>
+            <span class="kpi-subtext">Calculated from Original MRP</span>
+          </div>
+        </div>
+
+        <div class="kpi-card glass-card highlight-atl">
+          <div class="kpi-icon icon-gold">
+            <i class="fa-solid fa-fire-flame-curved"></i>
+          </div>
+          <div class="kpi-details">
+            <span class="kpi-label">All-Time Low Deals</span>
+            <div class="kpi-value text-gold" id="kpiAtlDeals">--</div>
+            <span class="kpi-subtext">Lowest price in 22 months</span>
+          </div>
+        </div>
+
+        <div class="kpi-card glass-card">
+          <div class="kpi-icon icon-cyan">
+            <i class="fa-solid fa-boxes-stacked"></i>
+          </div>
+          <div class="kpi-details">
+            <span class="kpi-label">Stock Health</span>
+            <div class="kpi-value" id="kpiStockHealth">--/25</div>
+            <span class="kpi-subtext" id="kpiStockSubtext">All units in stock</span>
+          </div>
+        </div>
+
+        <div class="kpi-card glass-card">
+          <div class="kpi-icon icon-purple">
+            <i class="fa-solid fa-arrow-trend-down"></i>
+          </div>
+          <div class="kpi-details">
+            <span class="kpi-label">Top 30-Day Price Drop</span>
+            <div class="kpi-value text-purple" id="kpiTopDrop">--</div>
+            <span class="kpi-subtext truncate-1" id="kpiTopDropProduct">Analyzing trends...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Charts & Visual Analytics Section -->
+      <section class="analytics-section">
+        <!-- Main Price History Multi-Line Chart -->
+        <div class="chart-container-large glass-card">
+          <div class="chart-header">
+            <div>
+              <h3>22-Month Price Fluctuations Matrix</h3>
+              <p class="chart-desc">Historical monthly price benchmarks (Nov 2024 – Aug 2026) across product categories</p>
+            </div>
+            <div class="chart-controls">
+              <select id="chartCategoryFilter" onchange="updateMainChartCategory(this.value)">
+                <option value="all">Compare All Categories</option>
+                <option value="Gaming Laptops">Gaming Laptops</option>
+                <option value="Everyday Laptops">Everyday Laptops</option>
+                <option value="Monitors">Monitors</option>
+                <option value="Desktops & AIO">Desktops & AIO</option>
+                <option value="Accessories">Accessories</option>
+              </select>
+            </div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="mainHistoryChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Secondary Breakdown Charts -->
+        <div class="chart-container-small glass-card">
+          <div class="chart-header">
+            <div>
+              <h3>Category Portfolio Share</h3>
+              <p class="chart-desc">ASIN distribution by category</p>
+            </div>
+          </div>
+          <div class="canvas-wrapper doughnut-wrapper">
+            <canvas id="categoryDonutChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Product Explorer & ASIN Table Section -->
+      <section class="table-section glass-card">
+        <div class="table-toolbar">
+          <div class="toolbar-left">
+            <h2>Acer ASIN Price Explorer</h2>
+            <p class="table-subtitle">Displaying live prices, 22-month lowest benchmarks, stock status, and product links</p>
+          </div>
+
+          <div class="toolbar-right">
+            <!-- Search Input -->
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="searchInput" placeholder="Search by ASIN, model or specs..." onkeyup="filterTable()">
+            </div>
+
+            <!-- Category Filter Tabs -->
+            <div class="category-tabs" id="categoryTabs">
+              <button class="cat-tab active" onclick="setCategoryFilter('all', this)">All (25)</button>
+              <button class="cat-tab" onclick="setCategoryFilter('Gaming Laptops', this)">Gaming</button>
+              <button class="cat-tab" onclick="setCategoryFilter('Everyday Laptops', this)">Laptops</button>
+              <button class="cat-tab" onclick="setCategoryFilter('Monitors', this)">Monitors</button>
+              <button class="cat-tab" onclick="setCategoryFilter('Desktops & AIO', this)">Desktops</button>
+              <button class="cat-tab" onclick="setCategoryFilter('Accessories', this)">Accessories</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Responsive Products Table -->
+        <div class="table-responsive">
+          <table class="data-table" id="productsTable">
+            <thead>
+              <tr>
+                <th width="120">ASIN</th>
+                <th>Product Details</th>
+                <th width="140">Category</th>
+                <th width="140" class="text-right">Today's Price</th>
+                <th width="120" class="text-right">MRP</th>
+                <th width="100" class="text-center">Discount</th>
+                <th width="140" class="text-right">22-Mo Low</th>
+                <th width="130" class="text-center">Stock Status</th>
+                <th width="180" class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Dynamically populated rows -->
+              <tr>
+                <td colspan="9" class="text-center py-5">
+                  <div class="loading-spinner"></div>
+                  <p class="mt-2 text-muted">Loading 25 Acer ASIN records...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <p>Acer Amazon Price Intelligence Platform &bull; Real-time crawler &bull; 22-Month Fluctuation Analyzer</p>
+        <div class="footer-links">
+          <span><i class="fa-solid fa-server"></i> FastAPI Backend</span>
+          <span><i class="fa-solid fa-database"></i> SQLite Engine</span>
+          <span><i class="fa-solid fa-file-excel"></i> Styled openpyxl Exporter</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Product Detail & 22-Month Price Modal -->
+  <div class="modal-overlay" id="productModal" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-content glass-card">
+      <button class="modal-close" onclick="closeModal()">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="modal-header-info">
+        <div class="modal-thumb-box">
+          <img id="modalProductImg" src="" alt="Product Thumbnail">
+        </div>
+        <div class="modal-title-info">
+          <div class="modal-badges">
+            <span class="badge badge-category" id="modalCategory">Category</span>
+            <span class="badge badge-asin" id="modalAsin">ASIN: B000000000</span>
+            <span class="badge badge-deal" id="modalDealBadge">All-Time Low</span>
+          </div>
+          <h2 id="modalProductTitle">Product Title</h2>
+          <div class="modal-rating" id="modalRating">
+            <i class="fa-solid fa-star text-gold"></i> 4.5 &bull; 1,200 Reviews
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Price Metrics Grid -->
+      <div class="modal-metrics-grid">
+        <div class="metric-box">
+          <span class="m-label">Today's Price</span>
+          <span class="m-val text-cyan" id="modalCurrentPrice">₹0</span>
+        </div>
+        <div class="metric-box">
+          <span class="m-label">Original MRP</span>
+          <span class="m-val text-muted strike" id="modalMrp">₹0</span>
+        </div>
+        <div class="metric-box">
+          <span class="m-label">22-Month Low</span>
+          <span class="m-val text-emerald" id="modalMinPrice">₹0</span>
+        </div>
+        <div class="metric-box">
+          <span class="m-label">22-Month High</span>
+          <span class="m-val" id="modalMaxPrice">₹0</span>
+        </div>
+        <div class="metric-box">
+          <span class="m-label">22-Month Avg</span>
+          <span class="m-val" id="modalAvgPrice">₹0</span>
+        </div>
+      </div>
+
+      <!-- Modal 22-Month Single Product Chart -->
+      <div class="modal-chart-box">
+        <div class="modal-chart-title">22-Month Price Fluctuation History</div>
+        <div class="canvas-wrapper-modal">
+          <canvas id="modalProductChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="scrapeSingleModalAsin()">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>Re-Scrape Live</span>
+        </button>
+        <a id="modalAmazonLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-amazon" onclick="window.open(this.href, '_blank'); return false;">
+          <i class="fa-brands fa-amazon"></i>
+          <span>View on Amazon</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- App Scripts -->
+  <script src="/js/charts.js?v=1.0.2"></script>
+  <script src="/js/app.js?v=1.0.2"></script>
+</body>
+</html>
