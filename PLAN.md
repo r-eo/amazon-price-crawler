@@ -1,91 +1,75 @@
-# Acer Amazon Price Tracker & Intelligence Platform — Project Blueprint & Roadmap
+# Acer Amazon Price Intelligence & Dual-Dashboard Platform — Blueprint & Roadmap
 
 ## 1. Executive Overview
 
-This project is a dedicated price intelligence, crawling, and historical analytics system for **25 representative Acer products on Amazon**, identified and tracked by their **Amazon Standard Identification Numbers (ASINs)**.
+This project is a dedicated price intelligence, crawling, and historical analytics platform featuring **two specialized dashboards**:
+1. **🖥️ Acer Monitors Dashboard:** Dedicated tracking, KPIs, 22-month price trajectory, and independent dynamic/daily Excel reports for Acer monitors.
+2. **📦 Other Products Dashboard:** Dedicated tracking for other Amazon product ASINs (laptops, desktops, projectors, accessories) with independent analytics and Excel reports.
+3. **🌐 All Portfolio View:** Consolidated aggregate view across all tracked inventory.
 
-The solution provides:
-- **Statistics Dashboard:** A modern, dark-mode glassmorphism interface displaying summary KPIs, 22-month price trajectory charts (Chart.js), category breakdown, and an interactive ASIN explorer.
+### Key Capabilities:
+- **Executive Monotone Design System:** Modern corporate dark palette (`#090D16`, `#141B2A`, `#1E293B`) with high-contrast typography, clear tabular layout, and subdued status badges.
 - **22-Month Historical Price Matrix:** Full monthly price tracking and seasonal fluctuation analysis (accounting for Prime Day, Diwali / Great Indian Festival, Black Friday, Republic Day, and natural depreciation).
-- **Downloadable Styled Excel (.xlsx) Report:** A multi-tab, beautifully styled spreadsheet containing full product details, live prices, discounts, ATL (All-Time Low) highlights, a 22-month price history matrix, and category benchmark statistics.
+- **Dynamic & Daily Excel Generation (.xlsx):** Generates separate multi-sheet Excel reports (`Acer_Monitors_Price_Tracker.xlsx` and `Other_Products_Price_Tracker.xlsx`) on automated daily schedules (10:00 AM) and **dynamically re-generates whenever live price fluctuations are detected**.
+- **Interactive ASIN Ingestion:** Built-in modal and API endpoints to easily add single ASINs or batch import multi-line lists of ASINs directly to either dashboard.
 - **Amazon Live Web Scraper:** Anti-bot resistant scraping engine using `curl_cffi` (Chrome TLS fingerprinting) and fallback to `requests` + `BeautifulSoup4`.
-- **Cloud-Ready Architecture:** Designed to run locally with zero-configuration SQLite, and easily deployable to **Render** or **Vercel**.
+- **Cloud-Ready Architecture:** Zero-configuration SQLite local run, easily deployable to **Render** or **Vercel**.
 
 ---
 
 ## 2. System Architecture
 
 ```
-                               ┌─────────────────────────┐
-                               │   Amazon Product Pages  │
-                               └────────────┬────────────┘
-                                            │ (curl_cffi / bs4)
-                                            ▼
-┌─────────────────────────┐    ┌─────────────────────────┐
-│   User Web Dashboard    │◄───┤   FastAPI REST Engine   │
-│  (KPIs / Charts / UI)   │    │  (app/main.py)          │
-└────────────┬────────────┘    └────────────┬────────────┘
-             │                              │
-             │ Direct Download              │
-             ▼                              ▼
-┌─────────────────────────┐    ┌─────────────────────────┐
-│ Formatted Excel Export  │    │     SQLite Database     │
-│   (openpyxl Multi-Tab)  │    │ (Products / 22-Mo Hist) │
-└─────────────────────────┘    └─────────────────────────┘
+                          ┌─────────────────────────────────────┐
+                          │   Professional Monotone Dashboard   │
+                          │   (Slate / Charcoal / Zinc Theme)   │
+                          └──────┬───────────────────────┬──────┘
+                                 │                       │
+              ┌──────────────────┴──┐                 ┌──┴──────────────────┐
+              │ Acer Monitors Tab   │                 │ Other Products Tab  │
+              │ - Dedicated KPIs    │                 │ - Dedicated KPIs    │
+              │ - Monitor 22-Mo Chart                 │ - Other 22-Mo Chart │
+              │ - Live Product Grid │                 │ - Live Product Grid │
+              │ - Add ASIN Modal    │                 │ - Add ASIN Modal    │
+              └──────────┬──────────┘                 └──────────┬──────────┘
+                         │                                       │
+                         ▼                                       ▼
+        ┌────────────────────────────────┐     ┌────────────────────────────────┐
+        │ Acer Monitors Excel Generator  │     │ Other Products Excel Generator │
+        │ - Daily Scheduled Sync (10 AM) │     │ - Daily Scheduled Sync (10 AM) │
+        │ - Dynamic on Price Fluctuation │     │ - Dynamic on Price Fluctuation │
+        └────────────────────────────────┘     └────────────────────────────────┘
 ```
 
 ---
 
-## 3. Product Portfolio (25 Tracked Acer ASINs)
+## 3. Product Groups & Dynamic ASIN Ingestion
 
-| ASIN | Product Name / Specs | Category | Baseline MRP |
-| :--- | :--- | :--- | :--- |
-| `B0C9QZZHRK` | Acer Nitro V (i5-13420H / RTX 4050 / 144Hz) | Gaming Laptops | ₹92,999 |
-| `B09X7861PP` | Acer Nitro 5 (Ryzen 7 7735HS / RTX 3050) | Gaming Laptops | ₹84,999 |
-| `B0CVF5Z8M3` | Acer Predator Helios 16 (i9-14900HX / RTX 4080 / 240Hz) | Gaming Laptops | ₹2,49,999 |
-| `B0C3CYG355` | Acer Predator Helios Neo 16 (i7-13700HX / RTX 4060) | Gaming Laptops | ₹1,49,999 |
-| `B0CD7R4Q7V` | Acer Nitro 16 (Ryzen 7 7840HS / RTX 4060 / 165Hz) | Gaming Laptops | ₹1,39,999 |
-| `B0B8Y476G2` | Acer Aspire 3 (i3-1215U / 8GB / 512GB SSD) | Everyday Laptops | ₹47,999 |
-| `B09X79TKLL` | Acer Aspire 5 (i5-1335U / 16GB / FHD) | Everyday Laptops | ₹69,999 |
-| `B0CWLLQZVT` | Acer Aspire 7 (i5-12450H / RTX 3050) | Everyday Laptops | ₹78,999 |
-| `B0C5MFQ27C` | Acer Swift Go 14 (i5-13500H / 2.8K 90Hz OLED) | Everyday Laptops | ₹79,999 |
-| `B0CY2M8LNV` | Acer Swift Go 14 AI (Intel Core Ultra 5 125H / OLED) | Everyday Laptops | ₹99,999 |
-| `B0B6F6K4VT` | Acer Extensa 15 (i3-1115G4 / 8GB / 256GB SSD) | Everyday Laptops | ₹42,999 |
-| `B0CDGZ1N9P` | Acer Chromebook Plus 514 (Ryzen 3 7320C / FHD IPS) | Everyday Laptops | ₹45,999 |
-| `B07PGL2ZSL` | Acer Nitro VG270 S 27" FHD 165Hz IPS Gaming Monitor | Monitors | ₹19,999 |
-| `B09HN53625` | Acer Nitro XV272U V3 27" WQHD 180Hz 0.5ms Monitor | Monitors | ₹29,999 |
-| `B088FLG413` | Acer EK220Q 21.5" FHD Eye Care VA Monitor | Monitors | ₹9,499 |
-| `B09W9D6Q1Z` | Acer Nitro KG241Y 23.8" FHD 165Hz Gaming Monitor | Monitors | ₹14,999 |
-| `B08L7V9Q6J` | Acer SA272 E 27" Ultra Slim 100Hz IPS Monitor | Monitors | ₹16,999 |
-| `B0CB7Z4W6N` | Acer Predator XB273U 27" WQHD 180Hz IPS Monitor | Monitors | ₹38,999 |
-| `B089NWN2C6` | Acer CB282K 28" UHD 4K IPS Pro Monitor | Monitors | ₹34,999 |
-| `B0CH1G4F3M` | Acer Aspire C24 All-in-One Desktop (i3-1215U / 23.8") | Desktops & AIO | ₹55,999 |
-| `B0CL5N8Y4R` | Acer Nitro 50 Gaming Desktop (i5-13400F / RTX 3060) | Desktops & AIO | ₹1,09,999 |
-| `B08XWW3Z1S` | Acer X1128H SVGA 4500 Lumens DLP Projector | Desktops & AIO | ₹39,999 |
-| `B07VN9V97T` | Acer Predator Cestus 330 RGB Gaming Mouse (16K DPI) | Accessories | ₹4,999 |
-| `B0813B2H8S` | Acer Predator Aethon 300 Mechanical Gaming Keyboard | Accessories | ₹8,999 |
-| `B08XJ8P6KV` | Acer Nitro Gaming Headset 50mm Drivers | Accessories | ₹3,499 |
+### Group A: Acer Monitors (`acer_monitors`)
+- Tracks user-provided and verified Acer monitor ASINs.
+- Features dedicated statistics (Average Monitor Discount, Monitor ATL Deals, Stock Health).
+- Produces `Acer_Monitors_Price_Tracker.xlsx`.
+
+### Group B: Other Products (`other_products`)
+- Tracks user-provided laptops, desktops, and other Amazon ASINs.
+- Produces `Other_Products_Price_Tracker.xlsx`.
 
 ---
 
-## 4. Excel Schema (Iteration 1 Structure)
+## 4. Excel Schema (Monotone Executive Styling)
 
-The downloadable `.xlsx` file generated by `app/excel_exporter.py` features 3 dedicated tabs:
+Each generated workbook features 3 dedicated tabs:
 
-### Sheet 1: `Acer_Product_Overview`
-- **Columns:** ASIN, Product Title, Category, Today's Price, MRP, Discount %, Stock Status, 22-Mo Lowest Price, 22-Mo Highest Price, 22-Mo Average Price, % Off All-Time High, Rating, Amazon Product Link.
-- **Formatting:** Navy/Teal header theme, alternating row shading, currency formatting (`₹#,##0`), green highlight on All-Time Low deals, clickable hyperlinks.
+### Sheet 1: `Product_Overview`
+- **Columns:** ASIN, Product Title, Category, Today's Price (`₹`), MRP (`₹`), Discount %, Stock Status, 22-Mo Lowest Price (`₹`), 22-Mo Highest Price (`₹`), 22-Mo Avg Price (`₹`), % Off ATH, Rating, Amazon Link.
+- **Styling:** Charcoal/Slate headers (`#1E293B`), thin borders (`#CBD5E1`), alternating rows (`#F8FAFC`), subtle muted mint highlights on All-Time Low deals, and direct Amazon product links.
 
 ### Sheet 2: `22_Months_Price_History`
-- **Columns:** ASIN, Product Title, Category, 22 Monthly Columns (Nov 2024 to Aug 2026), 22-Mo Min, 22-Mo Max, Volatility %.
-- **Formatting:** Highlight on the exact historical month when the lowest price occurred.
+- **Columns:** ASIN, Product Title, Category, Baseline MRP, 22 Monthly Columns (e.g., Nov 2024 to Aug 2026), 22-Mo Min, 22-Mo Max.
+- **Styling:** Highlights the specific month when the lowest historical price occurred.
 
 ### Sheet 3: `Monthly_Statistics`
-- **Columns:** Category, Metric, 22 Monthly Average Price Benchmarks.
-
-> [!TIP]
-> **Custom Excel Schema Integration (Iteration 2):**
-> When you provide your custom Excel schema file or column mapping, we will adjust `app/excel_exporter.py` to match your exact headers, data types, custom formulas, and sheet layout.
+- **Columns:** Category / Scope, Metric, 22 Monthly Average Price Benchmarks + Overall Portfolio Benchmark row.
 
 ---
 
@@ -102,25 +86,15 @@ python run.py
 ```
 
 ### B. Deploying to Render.com (Web Service)
-1. Push your repository to GitHub / GitLab.
-2. In the [Render Dashboard](https://dashboard.render.com), click **New +** -> **Web Service**.
-3. Connect your repository.
-4. Render will automatically detect `render.yaml` or you can manually set:
+1. Push repository to GitHub / GitLab.
+2. In [Render Dashboard](https://dashboard.render.com), click **New +** -> **Web Service**.
+3. Render detects `render.yaml` or you can manually set:
    - **Environment:** `Python 3`
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Click **Deploy**.
+4. Click **Deploy**.
 
 ### C. Deploying to Vercel (Serverless)
-1. Install Vercel CLI: `npm i -g vercel` or link your GitHub repo in the [Vercel Dashboard](https://vercel.com).
+1. Install Vercel CLI: `npm i -g vercel` or link GitHub repo in [Vercel Dashboard](https://vercel.com).
 2. The included `vercel.json` routes all requests to `app/main.py`.
 3. Run `vercel deploy` or push to main branch.
-
----
-
-## 6. Future Iterations Roadmap
-
-- **Iteration 2 (Custom Excel Schema & Importer):** Ingest custom Excel template provided by user; support uploading existing spreadsheets for batch ASIN enrichment.
-- **Iteration 3 (Real-Time Push Alerts):** Integration with Telegram Bot API and Discord Webhooks for automated price drop alerts whenever a product hits a target threshold or new 22-month low.
-- **Iteration 4 (Automated Scheduled Crawling):** Background worker using `APScheduler` or Render Cron Job for continuous periodic scraping at user-defined intervals (e.g., every 6 hours).
-- **Iteration 5 (Keepa API / CamelCamelCamel Sync):** Direct integration with Keepa API for official historical Amazon data sync.

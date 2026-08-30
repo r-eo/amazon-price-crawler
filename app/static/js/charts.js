@@ -1,47 +1,48 @@
 /**
- * Visual Analytics & Chart.js Controllers for Acer Price Intelligence
+ * Executive Monotone Visual Analytics & Chart.js Controllers
  */
 
-let mainHistoryChartInstance = null;
-let categoryDonutChartInstance = null;
+let timelineChartInstance = null;
 let modalProductChartInstance = null;
 
-// Modern vibrant palette
-const CATEGORY_COLORS = {
-  "Gaming Laptops": { line: "#06B6D4", bg: "rgba(6, 182, 212, 0.15)" },     // Cyan
-  "Everyday Laptops": { line: "#10B981", bg: "rgba(16, 185, 129, 0.15)" },   // Emerald
-  "Monitors": { line: "#8B5CF6", bg: "rgba(139, 92, 246, 0.15)" },          // Purple
-  "Desktops & AIO": { line: "#F59E0B", bg: "rgba(245, 158, 11, 0.15)" },    // Amber
-  "Accessories": { line: "#EC4899", bg: "rgba(236, 72, 153, 0.15)" },       // Pink
-};
+// Executive Muted Palette
+const MONOTONE_PALETTE = [
+  { line: "#E2E8F0", bg: "rgba(226, 232, 240, 0.08)" }, // Silver
+  { line: "#38BDF8", bg: "rgba(56, 189, 248, 0.08)" },  // Steel Sky
+  { line: "#94A3B8", bg: "rgba(148, 163, 184, 0.08)" }, // Slate Gray
+  { line: "#818CF8", bg: "rgba(129, 140, 248, 0.08)" }, // Indigo Slate
+  { line: "#34D399", bg: "rgba(52, 211, 153, 0.08)" },  // Muted Mint
+  { line: "#F59E0B", bg: "rgba(245, 158, 11, 0.08)" },  // Bronze Amber
+];
 
-function initMainHistoryChart(monthLabels, categoryTrends, currencySymbol = "₹") {
-  const ctx = document.getElementById("mainHistoryChart");
+function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹") {
+  const ctx = document.getElementById("timelineChart");
   if (!ctx) return;
 
-  const datasets = Object.keys(categoryTrends).map((cat) => {
-    const styling = CATEGORY_COLORS[cat] || { line: "#38BDF8", bg: "rgba(56, 189, 248, 0.1)" };
+  const categories = Object.keys(categoryTrends);
+  const datasets = categories.map((cat, idx) => {
+    const style = MONOTONE_PALETTE[idx % MONOTONE_PALETTE.length];
     return {
       label: cat,
       data: categoryTrends[cat],
-      borderColor: styling.line,
-      backgroundColor: styling.bg,
-      borderWidth: 2.5,
-      tension: 0.35,
-      pointRadius: 3,
-      pointHoverRadius: 6,
-      pointBackgroundColor: styling.line,
-      pointBorderColor: "#0F172A",
-      pointBorderWidth: 2,
+      borderColor: style.line,
+      backgroundColor: style.bg,
+      borderWidth: 2,
+      tension: 0.3,
+      pointRadius: 2.5,
+      pointHoverRadius: 5,
+      pointBackgroundColor: style.line,
+      pointBorderColor: "#090D16",
+      pointBorderWidth: 1.5,
       fill: false,
     };
   });
 
-  if (mainHistoryChartInstance) {
-    mainHistoryChartInstance.destroy();
+  if (timelineChartInstance) {
+    timelineChartInstance.destroy();
   }
 
-  mainHistoryChartInstance = new Chart(ctx, {
+  timelineChartInstance = new Chart(ctx, {
     type: "line",
     data: {
       labels: monthLabels,
@@ -57,29 +58,30 @@ function initMainHistoryChart(monthLabels, categoryTrends, currencySymbol = "₹
       plugins: {
         legend: {
           position: "top",
+          align: "end",
           labels: {
             color: "#94A3B8",
-            font: { family: "Plus Jakarta Sans", size: 11, weight: "600" },
+            font: { family: "Inter", size: 11, weight: "500" },
             usePointStyle: true,
-            boxWidth: 8,
-            boxHeight: 8,
+            boxWidth: 6,
+            boxHeight: 6,
           },
         },
         tooltip: {
-          backgroundColor: "#0F172A",
+          backgroundColor: "#141B2A",
           titleColor: "#F8FAFC",
-          bodyColor: "#94A3B8",
-          borderColor: "rgba(255, 255, 255, 0.1)",
+          bodyColor: "#CBD5E1",
+          borderColor: "#28354A",
           borderWidth: 1,
-          padding: 12,
-          boxPadding: 6,
+          padding: 10,
+          boxPadding: 4,
           usePointStyle: true,
           callbacks: {
             label: function (context) {
               let label = context.dataset.label || "";
               if (label) label += ": ";
               if (context.parsed.y !== null) {
-                label += currencySymbol + context.parsed.y.toLocaleString();
+                label += currencySymbol + Math.round(context.parsed.y).toLocaleString();
               }
               return label;
             },
@@ -88,21 +90,20 @@ function initMainHistoryChart(monthLabels, categoryTrends, currencySymbol = "₹
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
+          grid: { color: "rgba(255, 255, 255, 0.03)" },
           ticks: {
             color: "#64748B",
-            font: { family: "Plus Jakarta Sans", size: 10 },
-            maxRotation: 45,
-            minRotation: 0,
+            font: { family: "Inter", size: 10 },
+            maxRotation: 0,
             autoSkip: true,
             maxTicksLimit: 11,
           },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
+          grid: { color: "rgba(255, 255, 255, 0.03)" },
           ticks: {
             color: "#64748B",
-            font: { family: "Plus Jakarta Sans", size: 10 },
+            font: { family: "Inter", size: 10 },
             callback: function (val) {
               return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);
             },
@@ -113,71 +114,18 @@ function initMainHistoryChart(monthLabels, categoryTrends, currencySymbol = "₹
   });
 }
 
-function initCategoryDonutChart(categoryBreakdown) {
-  const ctx = document.getElementById("categoryDonutChart");
+function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
+  const ctx = document.getElementById("modalProductHistoryChart");
   if (!ctx) return;
 
-  const labels = Object.keys(categoryBreakdown);
-  const data = Object.values(categoryBreakdown);
-  const bgColors = labels.map((l) => (CATEGORY_COLORS[l] ? CATEGORY_COLORS[l].line : "#38BDF8"));
-
-  if (categoryDonutChartInstance) {
-    categoryDonutChartInstance.destroy();
-  }
-
-  categoryDonutChartInstance = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels: labels,
-      datasets: [
-        {
-          data: data,
-          backgroundColor: bgColors,
-          borderColor: "#0F172A",
-          borderWidth: 3,
-          hoverOffset: 6,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: {
-            color: "#94A3B8",
-            font: { family: "Plus Jakarta Sans", size: 10, weight: "500" },
-            boxWidth: 8,
-            boxHeight: 8,
-            usePointStyle: true,
-          },
-        },
-        tooltip: {
-          backgroundColor: "#0F172A",
-          titleColor: "#F8FAFC",
-          bodyColor: "#94A3B8",
-          borderColor: "rgba(255, 255, 255, 0.1)",
-          borderWidth: 1,
-          padding: 10,
-        },
-      },
-      cutout: "68%",
-    },
-  });
-}
-
-function renderModalProductChart(historyPoints, currencySymbol = "₹") {
-  const ctx = document.getElementById("modalProductChart");
-  if (!ctx) return;
-
-  const labels = historyPoints.map((p) => p.month_label);
-  const prices = historyPoints.map((p) => p.price);
+  const labels = historyPoints.map((h) => h.month_label);
+  const prices = historyPoints.map((h) => h.price);
   const minPrice = Math.min(...prices);
 
-  // Point styling: Highlight the lowest price point in gold/emerald
-  const pointBg = prices.map((p) => (p === minPrice ? "#F59E0B" : "#06B6D4"));
-  const pointRad = prices.map((p) => (p === minPrice ? 7 : 4));
+  const pointBackgrounds = historyPoints.map((h) =>
+    h.price === minPrice ? "#10B981" : (h.is_sale ? "#38BDF8" : "#E2E8F0")
+  );
+  const pointRadii = historyPoints.map((h) => (h.price === minPrice ? 5 : 2.5));
 
   if (modalProductChartInstance) {
     modalProductChartInstance.destroy();
@@ -189,18 +137,18 @@ function renderModalProductChart(historyPoints, currencySymbol = "₹") {
       labels: labels,
       datasets: [
         {
-          label: "Price History (22 Months)",
+          label: "Price History",
           data: prices,
-          borderColor: "#06B6D4",
-          backgroundColor: "rgba(6, 182, 212, 0.12)",
-          borderWidth: 3,
-          tension: 0.3,
+          borderColor: "#E2E8F0",
+          backgroundColor: "rgba(226, 232, 240, 0.05)",
+          borderWidth: 2,
+          tension: 0.25,
+          pointBackgroundColor: pointBackgrounds,
+          pointBorderColor: "#090D16",
+          pointBorderWidth: 1.5,
+          pointRadius: pointRadii,
+          pointHoverRadius: 6,
           fill: true,
-          pointBackgroundColor: pointBg,
-          pointBorderColor: "#0F172A",
-          pointBorderWidth: 2,
-          pointRadius: pointRad,
-          pointHoverRadius: 8,
         },
       ],
     },
@@ -210,23 +158,18 @@ function renderModalProductChart(historyPoints, currencySymbol = "₹") {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "#0F172A",
+          backgroundColor: "#141B2A",
           titleColor: "#F8FAFC",
-          bodyColor: "#94A3B8",
-          borderColor: "rgba(255, 255, 255, 0.1)",
+          bodyColor: "#CBD5E1",
+          borderColor: "#28354A",
           borderWidth: 1,
-          padding: 12,
+          padding: 10,
           callbacks: {
             label: function (context) {
-              const idx = context.dataIndex;
-              const point = historyPoints[idx];
-              let str = `Price: ${currencySymbol}${context.parsed.y.toLocaleString()}`;
-              if (point.sale_tag) {
-                str += ` [${point.sale_tag}]`;
-              }
-              if (context.parsed.y === minPrice) {
-                str += ` (★ 22-Mo Lowest)`;
-              }
+              const h = historyPoints[context.dataIndex];
+              let str = "Price: " + currencySymbol + h.price.toLocaleString();
+              if (h.price === minPrice) str += " ★ ALL-TIME LOW";
+              if (h.sale_tag) str += ` (${h.sale_tag})`;
               return str;
             },
           },
@@ -234,21 +177,16 @@ function renderModalProductChart(historyPoints, currencySymbol = "₹") {
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
-          ticks: {
-            color: "#64748B",
-            font: { family: "Plus Jakarta Sans", size: 10 },
-            autoSkip: true,
-            maxTicksLimit: 11,
-          },
+          grid: { color: "rgba(255, 255, 255, 0.03)" },
+          ticks: { color: "#64748B", font: { size: 10 }, maxTicksLimit: 11 },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
+          grid: { color: "rgba(255, 255, 255, 0.03)" },
           ticks: {
             color: "#64748B",
-            font: { family: "Plus Jakarta Sans", size: 10 },
+            font: { size: 10 },
             callback: function (val) {
-              return currencySymbol + val.toLocaleString();
+              return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);
             },
           },
         },

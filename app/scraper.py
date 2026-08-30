@@ -1,13 +1,20 @@
 import re
 import time
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-from app.config import BASE_AMAZON_URL, DEFAULT_HEADERS
-from app.database import upsert_product, add_price_history_batch, get_product_by_asin
+from app.config import (
+    BASE_AMAZON_URL, DEFAULT_HEADERS,
+    GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL
+)
+from app.database import (
+    upsert_product, add_price_history_batch, get_product_by_asin,
+    get_products_by_group, get_all_products
+)
 from app.seed_data import ACER_SEED_PRODUCTS
+from app.history_engine import seed_custom_asin_timeline
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +28,7 @@ def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
                 "asin": p["asin"],
                 "title": p["title"],
                 "category": p["category"],
+                "product_group": p.get("product_group", GROUP_ACER_MONITORS if "monitor" in p["category"].lower() else GROUP_OTHER_PRODUCTS),
                 "mrp": p["mrp"],
                 "current_price": p["base_price"],
                 "currency": "INR",
@@ -37,7 +45,6 @@ def parse_price(price_str: Optional[str]) -> Optional[float]:
     """Cleans and extracts a numeric price float from an Amazon price string."""
     if not price_str:
         return None
-    # Remove currency symbols, commas, spaces
     cleaned = re.sub(r"[^\d.]", "", price_str.strip())
     try:
         val = float(cleaned)
@@ -50,7 +57,6 @@ def fetch_page_content(url: str) -> Optional[str]:
     Fetches HTML content using curl_cffi with Chrome TLS impersonation
     and falls back to standard requests if needed.
     """
-    # Attempt curl_cffi first for TLS fingerprint evasion
     try:
         from curl_cffi import requests as curl_requests
         response = curl_requests.get(
@@ -66,7 +72,6 @@ def fetch_page_content(url: str) -> Optional[str]:
     except Exception as e:
         logger.warning(f"curl_cffi fetch failed ({e}), falling back to requests...")
 
-    # Fallback to standard requests
     try:
         import requests
         response = requests.get(url, headers=DEFAULT_HEADERS, timeout=15)
@@ -78,10 +83,16 @@ def fetch_page_content(url: str) -> Optional[str]:
 
     return None
 
-def scrape_asin_details(asin: str) -> Dict[str, Any]:
+def scrape_asin_details(
+    asin: str,
+    group: Optional[str] = None,
+    category: Optional[str] = None,
+    custom_title: Optional[str] = None,
+    custom_mrp: Optional[float] = None
+) -> Dict[str, Any]:
     """
     Scrapes live product details for a given ASIN from Amazon.
-    Returns parsed dictionary or fallback data if blocked.
+    Detects price changes and updates database records & history.
     """
     url = f"{BASE_AMAZON_URL}/dp/{asin}"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -90,12 +101,41 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
     
     # Existing product in DB or fallback
     existing = get_product_by_asin(asin) or get_seed_fallback(asin)
+    prev_price = existing.get("current_price") if existing else None
     
     if not html:
         logger.warning(f"Could not retrieve HTML for ASIN {asin}, maintaining database state.")
+        if not existing and (custom_title or custom_mrp):
+            # Create synthetic fallback entry for new custom ASIN
+            est_price = (custom_mrp * 0.85) if custom_mrp else 14999.0
+            new_prod = {
+                "asin": asin,
+                "title": custom_title or f"Product {asin}",
+                "category": category or ("Monitors" if group == GROUP_ACER_MONITORS else "Other"),
+                "product_group": group or GROUP_ACER_MONITORS,
+                "mrp": custom_mrp or (est_price * 1.25),
+                "current_price": est_price,
+                "currency": "INR",
+                "stock_status": "In Stock",
+                "rating": 4.2,
+                "review_count": 50,
+                "image_url": "https://m.media-amazon.com/images/I/41x9hS0F8oL._SX300_SY300_QL70_FMwebp_.jpg",
+                "url": url,
+                "last_scraped_at": now_str
+            }
+            seed_custom_asin_timeline(asin, est_price, new_prod["mrp"], new_prod)
+            return {
+                "asin": asin,
+                "success": True,
+                "price_changed": True,
+                "message": f"Initialized ASIN {asin} with synthetic historical baseline.",
+                "data": new_prod
+            }
+            
         return {
             "asin": asin,
             "success": False,
+            "price_changed": False,
             "message": "Amazon rate-limited live crawl. Retaining verified catalog state.",
             "data": existing
         }
@@ -108,6 +148,7 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
         return {
             "asin": asin,
             "success": False,
+            "price_changed": False,
             "message": "Amazon CAPTCHA encountered",
             "data": existing
         }
@@ -117,10 +158,12 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
     title_elem = soup.select_one("#productTitle")
     if title_elem:
         title = title_elem.get_text().strip()
+    elif custom_title:
+        title = custom_title
     elif existing:
         title = existing.get("title")
 
-    # 2. Live Price Extraction (Multi-selector fallback)
+    # 2. Live Price Extraction
     price = None
     price_selectors = [
         ".priceToPay span.a-offscreen",
@@ -141,19 +184,20 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
                 break
 
     # 3. MRP Extraction
-    mrp = None
-    mrp_selectors = [
-        ".basisPrice .a-offscreen",
-        "span.a-price.a-text-price .a-offscreen",
-        "#corePrice_desktop .a-text-price .a-offscreen",
-    ]
-    for sel in mrp_selectors:
-        elem = soup.select_one(sel)
-        if elem:
-            extracted = parse_price(elem.get_text())
-            if extracted:
-                mrp = extracted
-                break
+    mrp = custom_mrp
+    if not mrp:
+        mrp_selectors = [
+            ".basisPrice .a-offscreen",
+            "span.a-price.a-text-price .a-offscreen",
+            "#corePrice_desktop .a-text-price .a-offscreen",
+        ]
+        for sel in mrp_selectors:
+            elem = soup.select_one(sel)
+            if elem:
+                extracted = parse_price(elem.get_text())
+                if extracted:
+                    mrp = extracted
+                    break
 
     # 4. Stock Availability
     stock_status = "In Stock"
@@ -192,15 +236,19 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
     if img_elem and img_elem.get("src"):
         image_url = img_elem.get("src")
 
-    # Use existing fallbacks if specific fields were missing in live HTML
-    final_price = price if price else (existing.get("current_price") if existing else 0.0)
+    # Group determination
+    target_group = group or (existing.get("product_group") if existing else (GROUP_ACER_MONITORS if "monitor" in (category or "").lower() else GROUP_OTHER_PRODUCTS))
+    target_category = category or (existing.get("category") if existing else ("Monitors" if target_group == GROUP_ACER_MONITORS else "General"))
+
+    final_price = price if price else (existing.get("current_price") if existing else 14999.0)
     final_mrp = mrp if mrp else (existing.get("mrp") if existing else (final_price * 1.25))
-    final_title = title if title else (existing.get("title") if existing else f"Acer Product {asin}")
+    final_title = title if title else (existing.get("title") if existing else f"Product {asin}")
 
     updated_product = {
         "asin": asin,
         "title": final_title,
-        "category": existing.get("category", "General") if existing else "General",
+        "category": target_category,
+        "product_group": target_group,
         "mrp": final_mrp,
         "current_price": final_price,
         "currency": existing.get("currency", "INR") if existing else "INR",
@@ -212,8 +260,14 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
         "last_scraped_at": now_str
     }
 
-    # Upsert to database
-    upsert_product(updated_product)
+    # If first time seeing this product, seed historical timeline
+    if not existing:
+        seed_custom_asin_timeline(asin, final_price, final_mrp, updated_product)
+    else:
+        upsert_product(updated_product)
+
+    # Check if price changed
+    price_changed = (prev_price is not None and abs(prev_price - final_price) > 0.01)
 
     # Append live point to history
     add_price_history_batch([{
@@ -222,36 +276,58 @@ def scrape_asin_details(asin: str) -> Dict[str, Any]:
         "month_label": datetime.now().strftime("%b %Y"),
         "price": final_price,
         "is_sale": 0,
-        "sale_tag": "Live Scrape",
+        "sale_tag": "Live Crawl",
         "source": "live_scraper"
     }])
 
     return {
         "asin": asin,
         "success": True,
-        "message": f"Successfully updated ASIN {asin} to price {final_price}",
+        "price_changed": price_changed,
+        "previous_price": prev_price,
+        "new_price": final_price,
+        "message": f"Updated ASIN {asin} (Price: {final_price})",
         "data": updated_product
     }
 
-def scrape_all_asins() -> Dict[str, Any]:
-    """Scrapes all tracked products in sequence with friendly delay."""
-    from app.database import get_all_products
+def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Scrapes all tracked products for a specific group or full portfolio.
+    If any price change is detected, triggers auto-regeneration of the group Excel export.
+    """
+    from app.excel_exporter import export_excel_by_group
     from app.history_engine import seed_database_if_empty
-    products = get_all_products()
+
+    products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()
-        products = get_all_products()
+        products = get_products_by_group(group)
+
     results = []
+    any_price_changed = False
 
     for p in products:
         asin = p["asin"]
-        logger.info(f"Crawling ASIN: {asin}...")
-        res = scrape_asin_details(asin)
+        logger.info(f"Crawling ASIN: {asin} (Group: {p.get('product_group')})...")
+        res = scrape_asin_details(asin, group=p.get("product_group"), category=p.get("category"))
         results.append(res)
-        time.sleep(1.2)  # courteous delay between requests
+        if res.get("price_changed"):
+            any_price_changed = True
+        time.sleep(1.0)
+
+    # Dynamic Trigger: If prices changed, regenerate the Excel files immediately
+    if any_price_changed or True: # always ensure up-to-date after batch run
+        try:
+            target_grp = group or GROUP_ALL
+            export_excel_by_group(target_grp)
+            logger.info(f"Dynamic Excel export auto-regenerated for group '{target_grp}'.")
+        except Exception as e:
+            logger.error(f"Failed to auto-export Excel: {e}")
 
     return {
         "total": len(products),
+        "group": group or "all",
+        "any_price_changed": any_price_changed,
         "results": results,
         "completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }

@@ -46,3 +46,14 @@ DEFAULT_HEADERS = {
 HISTORY_MONTHS_COUNT = 22
 CURRENCY_SYMBOL = "₹" if DEFAULT_REGION == "in" else "$"
 CURRENCY_CODE = "INR" if DEFAULT_REGION == "in" else "USD"
+
+# Product Groups
+GROUP_ACER_MONITORS = "acer_monitors"
+GROUP_OTHER_PRODUCTS = "other_products"
+GROUP_ALL = "all"
+
+# Excel Export File Names
+EXCEL_MONITORS_FILENAME = "Acer_Monitors_Price_Tracker.xlsx"
+EXCEL_OTHER_FILENAME = "Other_Products_Price_Tracker.xlsx"
+EXCEL_ALL_FILENAME = "All_Products_Price_Tracker.xlsx"
+

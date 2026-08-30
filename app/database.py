@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from app.config import DATABASE_PATH
+from app.config import DATABASE_PATH, GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS
 
 def get_db_connection() -> sqlite3.Connection:
     """Returns a SQLite connection with row factory enabled."""
@@ -10,7 +10,7 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 def init_db():
-    """Initializes the database schema if tables do not exist."""
+    """Initializes the database schema and performs migrations if needed."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -20,6 +20,7 @@ def init_db():
                 asin TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 category TEXT NOT NULL,
+                product_group TEXT DEFAULT 'acer_monitors',
                 mrp REAL NOT NULL,
                 current_price REAL NOT NULL,
                 currency TEXT DEFAULT 'INR',
@@ -33,6 +34,14 @@ def init_db():
             )
         """)
         
+        # Migration: Ensure product_group column exists on pre-existing tables
+        cursor.execute("PRAGMA table_info(products)")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "product_group" not in columns:
+            cursor.execute("ALTER TABLE products ADD COLUMN product_group TEXT DEFAULT 'acer_monitors'")
+            cursor.execute("UPDATE products SET product_group = 'acer_monitors' WHERE category = 'Monitors'")
+            cursor.execute("UPDATE products SET product_group = 'other_products' WHERE category != 'Monitors'")
+
         # Price history table (contains 22-month timeline and live scrapes)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS price_history (
@@ -51,23 +60,30 @@ def init_db():
         # Index on asin and timestamp for fast lookups
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_asin ON price_history(asin)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON price_history(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_group ON products(product_group)")
         
         conn.commit()
 
 def upsert_product(product_data: Dict[str, Any]):
-    """Inserts or updates a product record."""
+    """Inserts or updates a product record including its product_group."""
+    # Ensure default product_group if missing
+    if "product_group" not in product_data or not product_data["product_group"]:
+        cat = product_data.get("category", "")
+        product_data["product_group"] = GROUP_ACER_MONITORS if "monitor" in cat.lower() else GROUP_OTHER_PRODUCTS
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO products (
-                asin, title, category, mrp, current_price, currency,
+                asin, title, category, product_group, mrp, current_price, currency,
                 stock_status, rating, review_count, image_url, url, last_scraped_at
             ) VALUES (
-                :asin, :title, :category, :mrp, :current_price, :currency,
+                :asin, :title, :category, :product_group, :mrp, :current_price, :currency,
                 :stock_status, :rating, :review_count, :image_url, :url, :last_scraped_at
             ) ON CONFLICT(asin) DO UPDATE SET
                 title = excluded.title,
                 category = excluded.category,
+                product_group = excluded.product_group,
                 mrp = excluded.mrp,
                 current_price = excluded.current_price,
                 stock_status = excluded.stock_status,
@@ -78,6 +94,15 @@ def upsert_product(product_data: Dict[str, Any]):
                 last_scraped_at = excluded.last_scraped_at
         """, product_data)
         conn.commit()
+
+def delete_product_by_asin(asin: str) -> bool:
+    """Deletes a product and its associated price history by ASIN."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_history WHERE asin = ?", (asin,))
+        cursor.execute("DELETE FROM products WHERE asin = ?", (asin,))
+        conn.commit()
+        return cursor.rowcount > 0
 
 def add_price_history_batch(records: List[Dict[str, Any]]):
     """Batch inserts price history records."""
@@ -92,6 +117,22 @@ def add_price_history_batch(records: List[Dict[str, Any]]):
         """, records)
         conn.commit()
 
+def add_single_price_point(asin: str, price: float, timestamp: str = None, month_label: str = None, source: str = "live_crawl", is_sale: int = 0, sale_tag: str = None):
+    """Inserts a single new price observation into the history table."""
+    now = datetime.now()
+    if not timestamp:
+        timestamp = now.strftime("%Y-%m-%d")
+    if not month_label:
+        month_label = now.strftime("%b %Y")
+        
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO price_history (asin, timestamp, month_label, price, is_sale, sale_tag, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (asin, timestamp, month_label, price, is_sale, sale_tag, source))
+        conn.commit()
+
 def clear_all_products_and_history():
     """Clears all products and price history for a clean database reseed."""
     with get_db_connection() as conn:
@@ -101,10 +142,25 @@ def clear_all_products_and_history():
         conn.commit()
 
 def get_all_products() -> List[Dict[str, Any]]:
-    """Fetches all products ordered by category and title."""
+    """Fetches all products ordered by group, category and title."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products ORDER BY category, title")
+        cursor.execute("SELECT * FROM products ORDER BY product_group, category, title")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+def get_products_by_group(group: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Fetches products filtered by group ('acer_monitors' or 'other_products')."""
+    if not group or group.lower() in ("all", "both"):
+        return get_all_products()
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM products 
+            WHERE LOWER(product_group) = LOWER(?) 
+            ORDER BY category, title
+        """, (group,))
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 

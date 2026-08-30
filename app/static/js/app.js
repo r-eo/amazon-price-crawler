@@ -1,418 +1,582 @@
 /**
- * Acer Amazon Price Intelligence - Dashboard State & Controller
+ * Acer Amazon Intelligence Platform — Executive Dual Dashboard Controller
  */
 
+let currentGroup = "acer_monitors";
 let allProducts = [];
-let portfolioStats = {};
-let currentCategory = "all";
-let currentSearchQuery = "";
-let currentModalAsin = null;
-let isAtlFilterActive = false;
-const CURRENCY = "₹";
+let filteredProducts = [];
+let dashboardStats = {};
+let atlFilterActive = false;
+let currencySymbol = "₹";
 
-// Initialize on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
-  loadDashboardData();
-  
-  // Set automatic live time ticker
-  updateLiveTimestamp();
-  setInterval(updateLiveTimestamp, 60000);
-
-  // Keyboard shortcut to close modal on Escape
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
-  });
+  initApp();
 });
 
-function updateLiveTimestamp() {
-  const el = document.getElementById("lastUpdatedText");
-  if (el) {
-    const now = new Date();
-    el.textContent = `Live: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-}
-
-function toggleAtlFilter() {
-  isAtlFilterActive = !isAtlFilterActive;
-  const card = document.querySelector(".highlight-atl");
-  if (card) {
-    if (isAtlFilterActive) {
-      card.style.borderColor = "#F59E0B";
-      card.style.boxShadow = "0 0 25px rgba(245, 158, 11, 0.4)";
-      showToast("Filtering to All-Time Low Deals & Near ATL products", "info");
-    } else {
-      card.style.borderColor = "";
-      card.style.boxShadow = "";
-      showToast("Showing all products", "info");
-    }
-  }
-  renderTable();
-}
-
-let isInitialLoad = true;
-
-async function loadDashboardData() {
-  try {
-    // 1. Fetch portfolio stats
-    const statsRes = await fetch("/api/stats");
-    portfolioStats = await statsRes.json();
-    updateKPICards(portfolioStats);
-
-    // Render Charts
-    if (portfolioStats.month_labels && portfolioStats.category_trends) {
-      initMainHistoryChart(portfolioStats.month_labels, portfolioStats.category_trends, CURRENCY);
-      initCategoryDonutChart(portfolioStats.category_breakdown);
-    }
-
-    // 2. Fetch products table data
-    const prodRes = await fetch("/api/products");
-    const prodData = await prodRes.json();
-    allProducts = prodData.products || [];
-    renderTable();
-
-    // Auto-retry once on cold start if database is still finishing seed
-    if (isInitialLoad && allProducts.length === 0) {
-      isInitialLoad = false;
-      setTimeout(loadDashboardData, 1500);
-    } else {
-      isInitialLoad = false;
-    }
-
-  } catch (err) {
-    console.error("Failed to load dashboard data:", err);
-    if (isInitialLoad) {
-      setTimeout(loadDashboardData, 2000);
-      isInitialLoad = false;
-    } else {
-      showToast("Connecting to tracker backend...", "info");
-    }
-  }
-}
-
-function updateKPICards(stats) {
-  if (!stats || !stats.total_products) return;
-
-  document.getElementById("kpiTotalProducts").textContent = stats.total_products;
-  document.getElementById("kpiAvgDiscount").textContent = `${stats.avg_discount_pct}%`;
-  document.getElementById("kpiAtlDeals").textContent = `${stats.atl_deals_count} Products`;
+async function initApp() {
+  await fetchTabCounts();
+  await loadDashboardData();
+  await checkSchedulerStatus();
   
-  document.getElementById("kpiStockHealth").textContent = `${stats.in_stock_count}/${stats.total_products}`;
-  document.getElementById("kpiStockSubtext").textContent = stats.out_of_stock_count > 0 
-    ? `${stats.out_of_stock_count} units out of stock` 
-    : "100% catalog available";
+  // Refresh scheduler status every 3 minutes
+  setInterval(checkSchedulerStatus, 180000);
+}
 
-  if (stats.top_price_drop) {
-    const drop = stats.top_price_drop;
-    document.getElementById("kpiTopDrop").textContent = `-${drop.drop_pct}% (${CURRENCY}${drop.drop_amount.toLocaleString()})`;
-    document.getElementById("kpiTopDropProduct").textContent = drop.title;
-    document.getElementById("kpiTopDropProduct").title = drop.title;
-  } else {
-    document.getElementById("kpiTopDrop").textContent = "Stable";
-    document.getElementById("kpiTopDropProduct").textContent = "No recent price cut";
+/**
+ * Fetch counts for each tab badge
+ */
+async function fetchTabCounts() {
+  try {
+    const [resMonitors, resOther, resAll] = await Promise.all([
+      fetch("/api/products?group=acer_monitors"),
+      fetch("/api/products?group=other_products"),
+      fetch("/api/products?group=all")
+    ]);
+
+    const dataMonitors = await resMonitors.json();
+    const dataOther = await resOther.json();
+    const dataAll = await resAll.json();
+
+    document.getElementById("badgeMonitorsCount").textContent = dataMonitors.total || 0;
+    document.getElementById("badgeOtherCount").textContent = dataOther.total || 0;
+    document.getElementById("badgeAllCount").textContent = dataAll.total || 0;
+  } catch (err) {
+    console.error("Failed to load tab counts:", err);
   }
 }
 
-function renderTable() {
-  const tbody = document.getElementById("tableBody");
-  if (!tbody) return;
+/**
+ * Switch Active Dashboard
+ */
+async function switchDashboard(group) {
+  currentGroup = group;
+  atlFilterActive = false;
 
-  const filtered = allProducts.filter(p => {
-    const stats = p.stats || {};
-    const matchesCat = (currentCategory === "all" || p.category === currentCategory);
-    const matchesSearch = !currentSearchQuery || 
-      p.title.toLowerCase().includes(currentSearchQuery) ||
-      p.asin.toLowerCase().includes(currentSearchQuery) ||
-      p.category.toLowerCase().includes(currentSearchQuery);
-    const matchesAtl = !isAtlFilterActive || stats.is_atl || stats.is_near_atl;
-    return matchesCat && matchesSearch && matchesAtl;
+  // Update tab button active states
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    if (btn.getAttribute("data-group") === group) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
   });
 
-  if (filtered.length === 0) {
+  // Update Header / Action Buttons
+  const downloadBtn = document.getElementById("btnDownloadExcel");
+  const downloadText = document.getElementById("downloadBtnText");
+  const scrapeText = document.getElementById("scrapeBtnText");
+  const viewLabel = document.getElementById("currentViewLabel");
+  const kpiScopeLabel = document.getElementById("kpiLabelProducts");
+  const chartTitle = document.getElementById("chartTitle");
+
+  if (group === "acer_monitors") {
+    downloadBtn.href = "/api/export/excel?group=acer_monitors";
+    downloadText.textContent = "Download Monitors Excel (.xlsx)";
+    scrapeText.textContent = "Scrape Monitors";
+    viewLabel.innerHTML = "Viewing: <strong>Acer Monitors Dashboard</strong>";
+    kpiScopeLabel.textContent = "Tracked Monitors";
+    chartTitle.textContent = "Acer Monitors — 22-Month Price Trajectory";
+  } else if (group === "other_products") {
+    downloadBtn.href = "/api/export/excel?group=other_products";
+    downloadText.textContent = "Download Other Products Excel (.xlsx)";
+    scrapeText.textContent = "Scrape Other Products";
+    viewLabel.innerHTML = "Viewing: <strong>Other Products Dashboard</strong>";
+    kpiScopeLabel.textContent = "Tracked Products";
+    chartTitle.textContent = "Other Products — 22-Month Price Trajectory";
+  } else {
+    downloadBtn.href = "/api/export/excel?group=all";
+    downloadText.textContent = "Download All Portfolio Excel (.xlsx)";
+    scrapeText.textContent = "Scrape All Portfolio";
+    viewLabel.innerHTML = "Viewing: <strong>Full Product Portfolio</strong>";
+    kpiScopeLabel.textContent = "Total Products";
+    chartTitle.textContent = "Overall Portfolio — 22-Month Price Trajectory";
+  }
+
+  // Pre-select group in modal
+  const modalGroupSelect = document.getElementById("importGroupSelect");
+  if (modalGroupSelect && group !== "all") {
+    modalGroupSelect.value = group;
+  }
+
+  await loadDashboardData();
+  await fetchTabCounts();
+}
+
+/**
+ * Loads products, KPIs, and charts for active group
+ */
+async function loadDashboardData() {
+  try {
+    const [prodRes, statsRes] = await Promise.all([
+      fetch(`/api/products?group=${currentGroup}`),
+      fetch(`/api/stats?group=${currentGroup}`)
+    ]);
+
+    const prodData = await prodRes.json();
+    const statsData = await statsRes.json();
+
+    allProducts = prodData.products || [];
+    dashboardStats = statsData || {};
+    currencySymbol = prodData.currency || "₹";
+
+    renderKpiCards(dashboardStats);
+    populateCategoryFilter(allProducts);
+    applyFiltersAndRenderTable();
+
+    if (dashboardStats.month_labels && dashboardStats.category_trends) {
+      renderTimelineChart(dashboardStats.month_labels, dashboardStats.category_trends, currencySymbol);
+    }
+  } catch (err) {
+    console.error("Error loading dashboard data:", err);
+    showToast("Failed to fetch dashboard data.", "error");
+  }
+}
+
+/**
+ * Render KPI Cards
+ */
+function renderKpiCards(stats) {
+  document.getElementById("kpiTotalProducts").textContent = stats.total_products || 0;
+  document.getElementById("kpiAvgDiscount").textContent = `${stats.avg_discount_pct || 0}%`;
+  document.getElementById("kpiAtlDeals").textContent = stats.atl_deals_count || 0;
+  
+  const inStock = stats.in_stock_count || 0;
+  const total = stats.total_products || 0;
+  document.getElementById("kpiStockHealth").textContent = `${inStock}/${total}`;
+
+  const kpiSubtextScope = document.getElementById("kpiSubtextScope");
+  if (kpiSubtextScope) {
+    if (currentGroup === "acer_monitors") {
+      kpiSubtextScope.textContent = "Dedicated Monitor Catalog";
+    } else if (currentGroup === "other_products") {
+      kpiSubtextScope.textContent = "Laptops, Desktops & Other ASINs";
+    } else {
+      kpiSubtextScope.textContent = "Entire Tracked Portfolio";
+    }
+  }
+}
+
+/**
+ * Populate Category Dropdown
+ */
+function populateCategoryFilter(products) {
+  const select = document.getElementById("selectCategoryFilter");
+  if (!select) return;
+
+  const currentVal = select.value;
+  const categories = Array.from(new Set(products.map((p) => p.category))).sort();
+
+  select.innerHTML = '<option value="">All Categories</option>';
+  categories.forEach((cat) => {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = cat;
+    if (cat === currentVal) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+/**
+ * Apply filters (search, category, ATL) and render table
+ */
+function applyFiltersAndRenderTable() {
+  const searchQ = (document.getElementById("inputSearch")?.value || "").toLowerCase().trim();
+  const selectedCat = document.getElementById("selectCategoryFilter")?.value || "";
+
+  filteredProducts = allProducts.filter((p) => {
+    if (selectedCat && p.category !== selectedCat) return false;
+    if (searchQ) {
+      const matchTitle = (p.title || "").toLowerCase().includes(searchQ);
+      const matchAsin = (p.asin || "").toLowerCase().includes(searchQ);
+      const matchCat = (p.category || "").toLowerCase().includes(searchQ);
+      if (!matchTitle && !matchAsin && !matchCat) return false;
+    }
+    if (atlFilterActive) {
+      if (!p.stats || !p.stats.is_atl) return false;
+    }
+    return true;
+  });
+
+  renderProductsTable(filteredProducts);
+}
+
+function handleSearchInput() {
+  applyFiltersAndRenderTable();
+}
+
+function handleCategoryFilter() {
+  applyFiltersAndRenderTable();
+}
+
+function filterByAtl() {
+  atlFilterActive = !atlFilterActive;
+  if (atlFilterActive) {
+    showToast("Filtering table: Showing All-Time Low deals only.", "info");
+  } else {
+    showToast("Cleared All-Time Low filter.", "info");
+  }
+  applyFiltersAndRenderTable();
+}
+
+/**
+ * Render Data Table Rows
+ */
+function renderProductsTable(products) {
+  const tbody = document.getElementById("productsTableBody");
+  const countEl = document.getElementById("tableResultCount");
+  if (!tbody) return;
+
+  countEl.textContent = `Showing ${products.length} of ${allProducts.length} products`;
+  tbody.innerHTML = "";
+
+  if (products.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" class="text-center py-5 text-muted">
-          <i class="fa-solid fa-circle-exclamation fa-2x mb-2 text-dim"></i>
-          <p>No Acer products match the selected filter criteria.</p>
+        <td colspan="10" class="text-center" style="padding: 40px; color: var(--text-muted);">
+          <i class="fa-solid fa-box-open" style="font-size: 28px; margin-bottom: 10px; display: block;"></i>
+          No products found in this view. Click <strong>"Add / Import ASINs"</strong> to add products.
         </td>
       </tr>
     `;
     return;
   }
 
-  tbody.innerHTML = filtered.map(p => {
+  products.forEach((p) => {
     const stats = p.stats || {};
-    const discPct = stats.discount_from_mrp || 0;
-    const isAtl = stats.is_atl;
-    const isNearAtl = stats.is_near_atl;
-    const isOutOfStock = (p.stock_status || "").toLowerCase().includes("out of stock");
+    const tr = document.createElement("tr");
 
-    return `
-      <tr>
-        <td>
-          <div class="asin-badge" title="Click to copy ASIN" onclick="copyToClipboard('${p.asin}')">
-            <span>${p.asin}</span>
-            <i class="fa-regular fa-copy" style="font-size: 10px; cursor: pointer;"></i>
-          </div>
-        </td>
-        <td>
-          <div class="product-cell">
-            <img class="product-thumb" src="${p.image_url || 'https://via.placeholder.com/60'}" alt="${p.asin}" onerror="this.src='https://via.placeholder.com/60'">
-            <div class="product-info-text">
-              <a class="product-title-link" onclick="openProductModal('${p.asin}')" title="${p.title}">
-                ${p.title}
-              </a>
-              <div class="product-rating">
-                <i class="fa-solid fa-star text-gold"></i> ${p.rating} &bull; ${p.review_count.toLocaleString()} reviews
-              </div>
-            </div>
-          </div>
-        </td>
-        <td>
-          <span class="category-tag">${p.category}</span>
-        </td>
-        <td class="text-right">
-          <span class="price-current">${CURRENCY}${p.current_price.toLocaleString()}</span>
-        </td>
-        <td class="text-right">
-          <span class="price-mrp">${CURRENCY}${p.mrp.toLocaleString()}</span>
-        </td>
-        <td class="text-center">
-          <span class="discount-pill">-${discPct}%</span>
-        </td>
-        <td class="text-right">
-          <div class="low-price-stat">
-            <span class="low-price-val">${CURRENCY}${(stats.min_price || p.current_price).toLocaleString()}</span>
-            ${isAtl ? '<span class="atl-indicator"><i class="fa-solid fa-fire"></i> ATL Deal</span>' : ''}
-            ${(!isAtl && isNearAtl) ? '<span class="atl-indicator" style="color: #38BDF8;">Near ATL</span>' : ''}
-          </div>
-        </td>
-        <td class="text-center">
-          <span class="stock-badge ${isOutOfStock ? 'out-stock' : 'in-stock'}">
-            <i class="fa-solid ${isOutOfStock ? 'fa-circle-xmark' : 'fa-circle-check'}"></i>
-            ${p.stock_status}
-          </span>
-        </td>
-        <td class="text-center">
-          <div class="action-buttons">
-            <button class="btn-icon" title="View 22-Month Price History" onclick="openProductModal('${p.asin}')">
-              <i class="fa-solid fa-chart-line"></i>
-            </button>
-            <button class="btn-icon btn-scrape-single" title="Live Scrape this ASIN" onclick="scrapeSingleAsin('${p.asin}', this)">
-              <i class="fa-solid fa-arrows-rotate"></i>
-            </button>
-            <a class="btn-icon btn-amazon-action" title="Open on Amazon" href="${p.url}" target="_blank" rel="noopener noreferrer" onclick="window.open('${p.url}', '_blank'); return false;">
-              <i class="fa-brands fa-amazon"></i>
+    const isAtl = stats.is_atl;
+    const discount = stats.discount_from_mrp || 0;
+    const inStock = (p.stock_status || "").toLowerCase().includes("in stock");
+
+    const imgTag = p.image_url
+      ? `<img src="${p.image_url}" alt="thumb" class="product-thumb" loading="lazy" onerror="this.src='https://placehold.co/48x48/1E293B/94A3B8?text=Acer'">`
+      : `<i class="fa-solid fa-laptop" style="color: var(--text-muted); font-size: 18px;"></i>`;
+
+    tr.innerHTML = `
+      <td>
+        <div class="product-thumb-container">
+          ${imgTag}
+        </div>
+      </td>
+      <td>
+        <span class="asin-code" title="Click to copy ASIN" onclick="copyAsin('${p.asin}')" style="cursor: pointer;">
+          ${p.asin}
+        </span>
+      </td>
+      <td>
+        <div class="product-meta-cell">
+          <a href="${p.url}" target="_blank" rel="noopener" class="product-title-link" title="${p.title}">
+            ${p.title}
+          </a>
+          <div class="product-sub-info">
+            <span class="product-rating"><i class="fa-solid fa-star"></i> ${p.rating || 4.2}</span>
+            <span>&bull;</span>
+            <span>${(p.review_count || 0).toLocaleString()} reviews</span>
+            <span>&bull;</span>
+            <a href="${p.url}" target="_blank" rel="noopener" style="color: var(--text-muted); text-decoration: none;">
+              Amazon <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 9px;"></i>
             </a>
           </div>
-        </td>
-      </tr>
+        </div>
+      </td>
+      <td>
+        <span class="badge badge-muted">${p.category}</span>
+      </td>
+      <td class="text-right">
+        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+          <span class="price-val">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
+          ${isAtl ? `<span class="badge-atl">ATL DEAL</span>` : ""}
+        </div>
+      </td>
+      <td class="text-right">
+        <span class="mrp-val">${currencySymbol}${Math.round(p.mrp || 0).toLocaleString()}</span>
+      </td>
+      <td class="text-center">
+        <span class="badge badge-green">${discount}% OFF</span>
+      </td>
+      <td class="text-center">
+        <span class="price-val" style="color: var(--color-green); font-size: 12px;">
+          ${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}
+        </span>
+      </td>
+      <td class="text-center">
+        <span class="badge ${inStock ? 'badge-green' : 'badge-red'}">
+          ${inStock ? 'In Stock' : 'Unavailable'}
+        </span>
+      </td>
+      <td class="text-center">
+        <div class="action-buttons">
+          <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 22-Month Price Timeline">
+            <i class="fa-solid fa-chart-line"></i>
+          </button>
+          <button class="btn btn-icon btn-outline" onclick="scrapeSingleAsin('${p.asin}')" title="Live Crawl Amazon Price">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+          <button class="btn btn-icon btn-outline" onclick="confirmDeleteAsin('${p.asin}')" title="Delete ASIN" style="color: var(--color-red);">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </td>
     `;
-  }).join("");
-}
-
-// Category filter
-function setCategoryFilter(cat, btn) {
-  currentCategory = cat;
-  document.querySelectorAll(".cat-tab").forEach(b => b.classList.remove("active"));
-  if (btn) btn.classList.add("active");
-  renderTable();
-}
-
-// Search filter
-function filterTable() {
-  currentSearchQuery = document.getElementById("searchInput").value.trim().toLowerCase();
-  renderTable();
-}
-
-// Main Chart Category Dropdown Switcher
-function updateMainChartCategory(selectedCategory) {
-  if (!portfolioStats.month_labels || !portfolioStats.category_trends) return;
-
-  if (selectedCategory === "all") {
-    initMainHistoryChart(portfolioStats.month_labels, portfolioStats.category_trends, CURRENCY);
-  } else {
-    // Show only the selected category
-    const singleCatTrends = {};
-    singleCatTrends[selectedCategory] = portfolioStats.category_trends[selectedCategory] || [];
-    initMainHistoryChart(portfolioStats.month_labels, singleCatTrends, CURRENCY);
-  }
-}
-
-// Open Product 22-Month Modal
-async function openProductModal(asin) {
-  currentModalAsin = asin;
-  const modal = document.getElementById("productModal");
-  
-  try {
-    const res = await fetch(`/api/products/${asin}`);
-    const data = await res.json();
-    const prod = data.product;
-    const stats = data.stats;
-    const history = data.history;
-
-    document.getElementById("modalProductImg").src = prod.image_url || "";
-    document.getElementById("modalProductTitle").textContent = prod.title;
-    document.getElementById("modalCategory").textContent = prod.category;
-    document.getElementById("modalAsin").textContent = `ASIN: ${prod.asin}`;
-    document.getElementById("modalRating").innerHTML = `<i class="fa-solid fa-star text-gold"></i> ${prod.rating} &bull; ${prod.review_count.toLocaleString()} Customer Reviews`;
-    document.getElementById("modalAmazonLink").href = prod.url;
-
-    // Deal badge
-    const dealBadge = document.getElementById("modalDealBadge");
-    if (stats.is_atl) {
-      dealBadge.textContent = "★ All-Time Low Deal";
-      dealBadge.style.display = "inline-block";
-    } else if (stats.is_near_atl) {
-      dealBadge.textContent = "Near 22-Month Low (5%)";
-      dealBadge.style.display = "inline-block";
-    } else {
-      dealBadge.style.display = "none";
-    }
-
-    // Metrics
-    document.getElementById("modalCurrentPrice").textContent = `${CURRENCY}${prod.current_price.toLocaleString()}`;
-    document.getElementById("modalMrp").textContent = `${CURRENCY}${prod.mrp.toLocaleString()}`;
-    document.getElementById("modalMinPrice").textContent = `${CURRENCY}${stats.min_price.toLocaleString()}`;
-    document.getElementById("modalMaxPrice").textContent = `${CURRENCY}${stats.max_price.toLocaleString()}`;
-    document.getElementById("modalAvgPrice").textContent = `${CURRENCY}${stats.avg_price.toLocaleString()}`;
-
-    // Render single product chart
-    renderModalProductChart(history, CURRENCY);
-
-    modal.classList.add("active");
-  } catch (err) {
-    console.error("Failed to load product modal data:", err);
-    showToast("Failed to fetch ASIN details", "warning");
-  }
-}
-
-function closeModal() {
-  const modal = document.getElementById("productModal");
-  if (modal) modal.classList.remove("active");
-}
-
-function closeModalOnBackdrop(e) {
-  if (e.target.id === "productModal") {
-    closeModal();
-  }
-}
-
-// Live scrape triggers
-async function triggerScrapeAll() {
-  const btn = document.getElementById("btnRunScrape");
-  const origText = btn.innerHTML;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Crawling 25 ASINs...</span>`;
-  btn.disabled = true;
-
-  try {
-    const res = await fetch("/api/scrape", { method: "POST" });
-    const data = await res.json();
-    showToast(data.message || "Live crawl initiated in background!", "success");
-    
-    // Refresh table data after a short interval
-    setTimeout(loadDashboardData, 3000);
-  } catch (err) {
-    showToast("Live scraper request failed", "warning");
-  } finally {
-    setTimeout(() => {
-      btn.innerHTML = origText;
-      btn.disabled = false;
-    }, 2500);
-  }
-}
-
-async function scrapeSingleAsin(asin, btn) {
-  if (btn) {
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
-  }
-
-  try {
-    const res = await fetch(`/api/scrape?asin=${asin}`, { method: "POST" });
-    const data = await res.json();
-    showToast(`Live scrape completed for ASIN ${asin}`, "success");
-    await loadDashboardData();
-  } catch (err) {
-    showToast(`Failed to scrape ASIN ${asin}`, "warning");
-  } finally {
-    if (btn) {
-      btn.innerHTML = `<i class="fa-solid fa-arrows-rotate"></i>`;
-    }
-  }
-}
-
-async function scrapeSingleModalAsin() {
-  if (!currentModalAsin) return;
-  await scrapeSingleAsin(currentModalAsin);
-  openProductModal(currentModalAsin);
-}
-
-// Utility: Copy ASIN to clipboard
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast(`ASIN ${text} copied to clipboard!`, "success");
-  }).catch(() => {
-    showToast(`Copied ${text}`, "success");
+    tbody.appendChild(tr);
   });
 }
 
-// Explicit Excel Download Handler with Guaranteed File Naming
-async function downloadExcelReport(event) {
-  if (event) event.preventDefault();
-  
-  const btn = document.getElementById("btnDownloadExcel");
-  const origHtml = btn.innerHTML;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Generating Excel...</span>`;
-  btn.style.pointerEvents = "none";
-  
+function copyAsin(asin) {
+  navigator.clipboard.writeText(asin);
+  showToast(`Copied ASIN: ${asin}`, "info");
+}
+
+/**
+ * Scrape Single ASIN
+ */
+async function scrapeSingleAsin(asin) {
+  showToast(`Scraping Amazon live price for ${asin}...`, "info");
   try {
-    const response = await fetch("/api/export/excel");
-    if (!response.ok) throw new Error("Failed to generate Excel file");
-    
-    const blob = await response.blob();
-    const filename = `Acer_Amazon_Price_Tracker_22Months_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.xlsx`;
-    
-    // Create temporary blob download link with explicit filename
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.style.display = "none";
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    
-    setTimeout(() => {
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    }, 2000);
-    
-    showToast(`Downloaded ${filename} successfully!`, "success");
+    const res = await fetch(`/api/scrape?asin=${asin}`, { method: "POST" });
+    const data = await res.json();
+    if (data.status === "completed") {
+      showToast(`ASIN ${asin} updated successfully.`, "success");
+      await loadDashboardData();
+    } else {
+      showToast(`Scrape request submitted.`, "info");
+    }
   } catch (err) {
-    console.error("Excel download error:", err);
-    showToast("Failed to download Excel file. Please try again.", "warning");
-  } finally {
-    btn.innerHTML = origHtml;
-    btn.style.pointerEvents = "auto";
+    showToast(`Failed to crawl ASIN ${asin}`, "error");
   }
 }
 
-// Toast Notifications
-function showToast(message, type = "success") {
+/**
+ * Scrape Active Group
+ */
+async function triggerActiveGroupScrape() {
+  const scrapeBtn = document.getElementById("btnRunScrape");
+  scrapeBtn.disabled = true;
+  scrapeBtn.classList.add("loading");
+
+  showToast(`Initiating live crawl for ${currentGroup}...`, "info");
+
+  try {
+    const res = await fetch(`/api/scrape?group=${currentGroup}`, { method: "POST" });
+    const data = await res.json();
+    showToast(data.message || "Crawl job queued.", "success");
+    setTimeout(loadDashboardData, 3000);
+  } catch (err) {
+    showToast("Error starting live crawl.", "error");
+  } finally {
+    setTimeout(() => {
+      scrapeBtn.disabled = false;
+      scrapeBtn.classList.remove("loading");
+    }, 2000);
+  }
+}
+
+/**
+ * Delete ASIN
+ */
+async function confirmDeleteAsin(asin) {
+  if (!confirm(`Are you sure you want to remove ASIN ${asin} from tracking?`)) return;
+  try {
+    const res = await fetch(`/api/products/${asin}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.status === "success") {
+      showToast(`Removed ASIN ${asin}`, "success");
+      await loadDashboardData();
+      await fetchTabCounts();
+    }
+  } catch (err) {
+    showToast(`Failed to delete ASIN ${asin}`, "error");
+  }
+}
+
+/**
+ * Download Group Excel
+ */
+function downloadGroupExcel(e) {
+  showToast(`Preparing ${currentGroup} 22-Month Excel report...`, "info");
+}
+
+/**
+ * Product Timeline Detail Modal
+ */
+async function openProductDetailModal(asin) {
+  const modal = document.getElementById("productDetailModal");
+  const modalTitle = document.getElementById("modalProductTitle");
+  const modalAsin = document.getElementById("modalProductAsin");
+  const modalBody = document.getElementById("modalProductBody");
+
+  modal.classList.add("active");
+  modalBody.innerHTML = `
+    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+      <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px;"></i>
+      <p style="margin-top: 10px;">Loading historical 22-month timeline...</p>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/api/products/${asin}`);
+    const data = await res.json();
+
+    const p = data.product;
+    const stats = data.stats;
+    const history = data.history || [];
+
+    modalTitle.textContent = p.title;
+    modalAsin.textContent = `ASIN: ${p.asin}`;
+
+    modalBody.innerHTML = `
+      <div class="modal-product-summary">
+        <div class="modal-stat-box">
+          <span class="modal-stat-label">Today's Price</span>
+          <span class="modal-stat-val">${currencySymbol}${Math.round(p.current_price).toLocaleString()}</span>
+        </div>
+        <div class="modal-stat-box">
+          <span class="modal-stat-label">Baseline MRP</span>
+          <span class="modal-stat-val">${currencySymbol}${Math.round(p.mrp).toLocaleString()}</span>
+        </div>
+        <div class="modal-stat-box">
+          <span class="modal-stat-label">22-Month Lowest</span>
+          <span class="modal-stat-val" style="color: var(--color-green);">${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}</span>
+        </div>
+        <div class="modal-stat-box">
+          <span class="modal-stat-label">22-Month Average</span>
+          <span class="modal-stat-val">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div style="background-color: var(--bg-input); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">22-Month Trajectory & Seasonal Deal Markers</span>
+          <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-circle" style="color: var(--color-green); font-size: 8px;"></i> All-Time Low Marker</span>
+        </div>
+        <div style="height: 260px; position: relative;">
+          <canvas id="modalProductHistoryChart"></canvas>
+        </div>
+      </div>
+    `;
+
+    renderProductDetailModalChart(history, currencySymbol);
+  } catch (err) {
+    modalBody.innerHTML = `<p style="color: var(--color-red); text-align: center; padding: 20px;">Failed to load timeline details.</p>`;
+  }
+}
+
+function closeProductModal(e) {
+  const modal = document.getElementById("productDetailModal");
+  if (modal) modal.classList.remove("active");
+}
+
+/**
+ * Add / Import ASINs Modal
+ */
+function openAddAsinModal() {
+  const modal = document.getElementById("addAsinModal");
+  const modalGroupSelect = document.getElementById("importGroupSelect");
+  if (modalGroupSelect && currentGroup !== "all") {
+    modalGroupSelect.value = currentGroup;
+  }
+  if (modal) modal.classList.add("active");
+}
+
+function closeAddAsinModal(e) {
+  const modal = document.getElementById("addAsinModal");
+  if (modal) modal.classList.remove("active");
+}
+
+async function submitAddAsins(e) {
+  e.preventDefault();
+  const group = document.getElementById("importGroupSelect").value;
+  const rawText = document.getElementById("inputAsinList").value;
+  const customCat = document.getElementById("inputCustomCategory").value.trim();
+  const submitBtn = document.getElementById("btnSubmitImport");
+
+  // Parse comma or newline separated ASINs
+  const asins = rawText
+    .split(/[\n,;\s]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s.length === 10);
+
+  if (asins.length === 0) {
+    showToast("Please enter at least one valid 10-character Amazon ASIN.", "error");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Importing ${asins.length} ASIN(s)...`;
+
+  try {
+    const res = await fetch("/api/products/batch-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        asins: asins,
+        group: group,
+        category: customCat || null
+      })
+    });
+
+    const data = await res.json();
+    if (data.status === "success") {
+      showToast(`Successfully imported & crawled ${data.imported_count} ASIN(s).`, "success");
+      closeAddAsinModal();
+      document.getElementById("addAsinForm").reset();
+      
+      // If added to another dashboard, switch or reload
+      if (group !== currentGroup && currentGroup !== "all") {
+        await switchDashboard(group);
+      } else {
+        await loadDashboardData();
+        await fetchTabCounts();
+      }
+    } else {
+      showToast("Import failed. Please verify ASINs.", "error");
+    }
+  } catch (err) {
+    showToast("Network error during ASIN import.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> <span>Import & Crawl ASINs</span>`;
+  }
+}
+
+/**
+ * Daily Scheduler Status Ticker
+ */
+async function checkSchedulerStatus() {
+  try {
+    const res = await fetch("/api/scheduler/status");
+    const data = await res.json();
+    const el = document.getElementById("schedulerStatusText");
+    if (el && data.time_remaining) {
+      el.textContent = `Daily 10:00 AM Sync (in ${data.time_remaining})`;
+    }
+  } catch (e) {
+    // Silent fallback
+  }
+}
+
+/**
+ * Toast Notifications
+ */
+function showToast(message, type = "info") {
   const container = document.getElementById("toastContainer");
   if (!container) return;
 
   const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-    <i class="fa-solid ${type === 'success' ? 'fa-circle-check text-emerald' : 'fa-triangle-exclamation text-gold'}"></i>
-    <span>${message}</span>
-  `;
+  toast.className = `toast ${type}`;
 
+  let icon = '<i class="fa-solid fa-circle-info"></i>';
+  if (type === "success") icon = '<i class="fa-solid fa-circle-check"></i>';
+  if (type === "error") icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+
+  toast.innerHTML = `${icon}<span>${message}</span>`;
   container.appendChild(toast);
 
   setTimeout(() => {
     toast.style.opacity = "0";
-    toast.style.transform = "translateX(100%)";
+    toast.style.transform = "translateY(20px)";
     toast.style.transition = "all 0.3s ease";
     setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  }, 4000);
 }
