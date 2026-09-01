@@ -56,11 +56,31 @@ def init_db():
                 FOREIGN KEY (asin) REFERENCES products(asin) ON DELETE CASCADE
             )
         """)
+
+        # Price alerts table (tracks daily price drop events and notifications)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asin TEXT NOT NULL,
+                title TEXT NOT NULL,
+                category TEXT,
+                product_group TEXT,
+                previous_price REAL NOT NULL,
+                new_price REAL NOT NULL,
+                drop_amount REAL NOT NULL,
+                drop_pct REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                is_read INTEGER DEFAULT 0,
+                FOREIGN KEY (asin) REFERENCES products(asin) ON DELETE CASCADE
+            )
+        """)
         
         # Index on asin and timestamp for fast lookups
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_asin ON price_history(asin)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON price_history(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_group ON products(product_group)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_created ON price_alerts(created_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_read ON price_alerts(is_read)")
         
         conn.commit()
 
@@ -69,7 +89,7 @@ def upsert_product(product_data: Dict[str, Any]):
     # Ensure default product_group if missing
     if "product_group" not in product_data or not product_data["product_group"]:
         cat = product_data.get("category", "")
-        product_data["product_group"] = GROUP_ACER_MONITORS if "monitor" in cat.lower() else GROUP_OTHER_PRODUCTS
+        product_data["product_group"] = GROUP_ACER_MONITORS if ("stand" in cat.lower() or "screen" in cat.lower() or "monitor" in cat.lower()) else GROUP_OTHER_PRODUCTS
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -96,9 +116,10 @@ def upsert_product(product_data: Dict[str, Any]):
         conn.commit()
 
 def delete_product_by_asin(asin: str) -> bool:
-    """Deletes a product and its associated price history by ASIN."""
+    """Deletes a product, its price history, and alerts by ASIN."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_alerts WHERE asin = ?", (asin,))
         cursor.execute("DELETE FROM price_history WHERE asin = ?", (asin,))
         cursor.execute("DELETE FROM products WHERE asin = ?", (asin,))
         conn.commit()
@@ -133,10 +154,94 @@ def add_single_price_point(asin: str, price: float, timestamp: str = None, month
         """, (asin, timestamp, month_label, price, is_sale, sale_tag, source))
         conn.commit()
 
-def clear_all_products_and_history():
-    """Clears all products and price history for a clean database reseed."""
+def record_price_alert(
+    asin: str,
+    title: str,
+    category: str,
+    product_group: str,
+    previous_price: float,
+    new_price: float,
+    timestamp: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Records a price drop notification alert in the database if new_price < previous_price.
+    """
+    if new_price >= previous_price:
+        return None
+
+    drop_amount = round(previous_price - new_price, 2)
+    drop_pct = round((drop_amount / previous_price) * 100, 1) if previous_price > 0 else 0.0
+    now_str = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO price_alerts (
+                asin, title, category, product_group, previous_price, new_price, drop_amount, drop_pct, created_at, is_read
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (asin, title, category, product_group, previous_price, new_price, drop_amount, drop_pct, now_str))
+        conn.commit()
+        alert_id = cursor.lastrowid
+
+    return {
+        "id": alert_id,
+        "asin": asin,
+        "title": title,
+        "category": category,
+        "product_group": product_group,
+        "previous_price": previous_price,
+        "new_price": new_price,
+        "drop_amount": drop_amount,
+        "drop_pct": drop_pct,
+        "created_at": now_str,
+        "is_read": 0
+    }
+
+def get_recent_price_alerts(limit: int = 50, unread_only: bool = False) -> List[Dict[str, Any]]:
+    """Fetches recent price drop alerts ordered by timestamp descending."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if unread_only:
+            cursor.execute("""
+                SELECT * FROM price_alerts 
+                WHERE is_read = 0 
+                ORDER BY created_at DESC, id DESC 
+                LIMIT ?
+            """, (limit,))
+        else:
+            cursor.execute("""
+                SELECT * FROM price_alerts 
+                ORDER BY created_at DESC, id DESC 
+                LIMIT ?
+            """, (limit,))
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+def mark_alerts_as_read(alert_ids: Optional[List[int]] = None) -> int:
+    """Marks specified alerts or all unread alerts as read."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if alert_ids:
+            placeholders = ",".join("?" for _ in alert_ids)
+            cursor.execute(f"UPDATE price_alerts SET is_read = 1 WHERE id IN ({placeholders})", alert_ids)
+        else:
+            cursor.execute("UPDATE price_alerts SET is_read = 1 WHERE is_read = 0")
+        conn.commit()
+        return cursor.rowcount
+
+def get_unread_alerts_count() -> int:
+    """Returns total count of unread price alerts."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(id) as cnt FROM price_alerts WHERE is_read = 0")
+        row = cursor.fetchone()
+        return row["cnt"] if row else 0
+
+def clear_all_products_and_history():
+    """Clears all products, price history, and alerts for a clean database reseed."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_alerts")
         cursor.execute("DELETE FROM price_history")
         cursor.execute("DELETE FROM products")
         conn.commit()

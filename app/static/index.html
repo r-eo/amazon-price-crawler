@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acer Amazon Price Intelligence Platform</title>
-  <meta name="description" content="Dedicated enterprise price intelligence platform for Acer Monitors and Other Amazon Products. Real-time crawling, 22-month historical matrices, and automated Excel generation.">
+  <title>Acer Amazon Price Intelligence & Drop Tracker</title>
+  <meta name="description" content="Dedicated enterprise price intelligence platform for Acer Monitors, Hardware & Amazon Accessories. Real-time daily price checking, price drop notifications, 22-month historical matrices, and automated Excel exports.">
   
-  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -17,8 +17,8 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
-  <!-- Monotone Executive CSS -->
-  <link rel="stylesheet" href="/css/style.css?v=3.0.0">
+  <!-- Modern Slate & Cyber Gradient CSS -->
+  <link rel="stylesheet" href="/css/style.css?v=4.0.0">
 </head>
 <body>
   <div class="app-layout">
@@ -32,9 +32,9 @@
         <div class="brand-info">
           <div class="brand-title-row">
             <h1>ACER <span>INTELLIGENCE</span></h1>
-            <span class="env-badge">ENTERPRISE</span>
+            <span class="env-badge">ENTERPRISE v3.0</span>
           </div>
-          <p class="brand-desc">Amazon Dual-Dashboard Price Tracker & 22-Month Historical Analytics</p>
+          <p class="brand-desc">Amazon Dual Dashboard &bull; Daily Price Drop Alerts &bull; 22-Month Historical Analytics</p>
         </div>
       </div>
 
@@ -42,40 +42,101 @@
         <!-- Live Scheduler Status -->
         <div class="status-indicator" title="Automated Daily Crawl & Excel Sync Scheduled at 10:00 AM">
           <span class="status-dot"></span>
-          <span id="schedulerStatusText">Daily 10:00 AM Sync Active</span>
+          <span id="schedulerStatusText">Daily 10:00 AM Sync</span>
         </div>
+
+        <!-- Notification Bell with Unread Badge & Dropdown -->
+        <div class="notification-wrapper">
+          <button id="btnNotificationBell" class="btn btn-icon btn-outline notification-bell-btn" onclick="toggleNotificationPanel(event)" title="Price Drop Notifications">
+            <i class="fa-solid fa-bell"></i>
+            <span id="unreadAlertBadge" class="notification-badge" style="display: none;">0</span>
+          </button>
+
+          <!-- Notification Dropdown Panel -->
+          <div id="notificationPanel" class="notification-dropdown" onclick="event.stopPropagation()">
+            <div class="notification-header">
+              <div class="notif-title">
+                <i class="fa-solid fa-bolt text-amber"></i>
+                <span>Price Drop Alerts</span>
+                <span class="notif-count-pill" id="notifPanelCount">0</span>
+              </div>
+              <div class="notif-actions">
+                <button class="btn-link" onclick="markAllAlertsAsRead()" title="Mark all alerts as read">
+                  <i class="fa-solid fa-check-double"></i> Mark all read
+                </button>
+              </div>
+            </div>
+            
+            <div class="notification-list" id="notificationList">
+              <div class="notification-empty">
+                <i class="fa-solid fa-bell-slash"></i>
+                <p>No price drop alerts yet. Run a daily check to scan for deals!</p>
+              </div>
+            </div>
+
+            <div class="notification-footer">
+              <button class="btn btn-xs btn-primary full-width" onclick="triggerDailyPriceCheck()">
+                <i class="fa-solid fa-magnifying-glass-dollar"></i> Scan Amazon Prices Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Check Prices Now (Instant Daily Scan) -->
+        <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()">
+          <i class="fa-solid fa-bolt"></i>
+          <span>Check Prices Now</span>
+        </button>
 
         <!-- Add / Import ASINs Button -->
         <button id="btnOpenAddModal" class="btn btn-outline" onclick="openAddAsinModal()">
           <i class="fa-solid fa-plus"></i>
-          <span>Add / Import ASINs</span>
+          <span>Add ASINs</span>
         </button>
 
         <!-- Live Scrape Active Group Button -->
         <button id="btnRunScrape" class="btn btn-secondary" onclick="triggerActiveGroupScrape()">
           <i class="fa-solid fa-rotate"></i>
-          <span id="scrapeBtnText">Live Scrape Group</span>
+          <span id="scrapeBtnText">Scrape Tab</span>
         </button>
 
         <!-- Download Dedicated Group Excel Report -->
         <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)">
           <i class="fa-solid fa-file-excel"></i>
-          <span id="downloadBtnText">Download Monitors Excel (.xlsx)</span>
+          <span id="downloadBtnText">Download Excel (.xlsx)</span>
         </a>
       </div>
     </header>
 
-    <!-- Navigation Tab Segmented Switcher -->
+    <!-- Price Drop Alert Ticker Banner -->
+    <section id="priceDropBanner" class="price-drop-ticker-banner" style="display: none;">
+      <div class="banner-content">
+        <div class="banner-badge">
+          <i class="fa-solid fa-fire-flame-curved"></i> HOT PRICE DROPS TODAY
+        </div>
+        <div class="banner-text" id="bannerDropText">
+          Loading price drop highlights...
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-xs btn-amber" onclick="filterByPriceDrops()">
+            <i class="fa-solid fa-filter"></i> View All Drops
+          </button>
+          <button class="banner-close-btn" onclick="dismissPriceDropBanner()">&times;</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation Tab Segmented Switcher & Controls -->
     <section class="tab-navigation-wrapper">
       <div class="tab-switcher">
         <button class="tab-btn active" data-group="acer_monitors" onclick="switchDashboard('acer_monitors')">
           <i class="fa-solid fa-display"></i>
-          <span>Acer Monitors</span>
+          <span>Acer Monitors & Stands</span>
           <span class="tab-badge" id="badgeMonitorsCount">--</span>
         </button>
         <button class="tab-btn" data-group="other_products" onclick="switchDashboard('other_products')">
           <i class="fa-solid fa-boxes-stacked"></i>
-          <span>Other Products</span>
+          <span>Other Accessories</span>
           <span class="tab-badge" id="badgeOtherCount">--</span>
         </button>
         <button class="tab-btn" data-group="all" onclick="switchDashboard('all')">
@@ -86,7 +147,11 @@
       </div>
 
       <div class="tab-info-meta">
-        <span id="currentViewLabel">Viewing: <strong>Acer Monitors Dashboard</strong></span>
+        <button id="btnEnableBrowserNotif" class="btn btn-xs btn-outline" onclick="requestBrowserNotificationPermission()">
+          <i class="fa-solid fa-bell"></i>
+          <span id="notifPermText">Enable Push Alerts</span>
+        </button>
+        <span id="currentViewLabel">Viewing: <strong>Acer Monitors & Stands Dashboard</strong></span>
       </div>
     </section>
 
@@ -95,66 +160,70 @@
       
       <!-- Key Performance Indicators (KPI Cards) -->
       <section class="kpi-grid">
-        <div class="kpi-card">
+        <!-- 1. Products Scope -->
+        <div class="kpi-card card-indigo">
           <div class="kpi-header">
-            <span class="kpi-title" id="kpiLabelProducts">Tracked Monitors</span>
-            <div class="kpi-icon-box"><i class="fa-solid fa-display"></i></div>
+            <span class="kpi-title" id="kpiLabelProducts">Tracked Hardware</span>
+            <div class="kpi-icon-box icon-indigo"><i class="fa-solid fa-display"></i></div>
           </div>
           <div class="kpi-main">
-            <span class="kpi-val" id="kpiTotalProducts">--</span>
+            <span class="kpi-val text-indigo" id="kpiTotalProducts">--</span>
           </div>
           <div class="kpi-footer">
-            <span class="kpi-subtext" id="kpiSubtextScope">Dedicated Monitor Catalog</span>
+            <span class="kpi-subtext" id="kpiSubtextScope">Dedicated Hardware Catalog</span>
           </div>
         </div>
 
-        <div class="kpi-card">
+        <!-- 2. Average Discount -->
+        <div class="kpi-card card-emerald">
           <div class="kpi-header">
             <span class="kpi-title">Average Discount</span>
-            <div class="kpi-icon-box"><i class="fa-solid fa-percent"></i></div>
+            <div class="kpi-icon-box icon-emerald"><i class="fa-solid fa-percent"></i></div>
           </div>
           <div class="kpi-main">
-            <span class="kpi-val text-green" id="kpiAvgDiscount">--%</span>
+            <span class="kpi-val text-emerald" id="kpiAvgDiscount">--%</span>
           </div>
           <div class="kpi-footer">
-            <span class="kpi-subtext">Calculated from Baseline MRP</span>
+            <span class="kpi-subtext">Off Official Baseline MRP</span>
           </div>
         </div>
 
-        <div class="kpi-card clickable" onclick="filterByAtl()" title="Click to filter All-Time Low deals">
+        <!-- 3. Price Drops Detected -->
+        <div class="kpi-card card-amber clickable" onclick="filterByPriceDrops()" title="Click to filter products with price drops">
           <div class="kpi-header">
-            <span class="kpi-title">All-Time Low Deals</span>
-            <div class="kpi-icon-box"><i class="fa-solid fa-tag"></i></div>
+            <span class="kpi-title">Active Price Drops</span>
+            <div class="kpi-icon-box icon-amber"><i class="fa-solid fa-arrow-trend-down"></i></div>
           </div>
           <div class="kpi-main">
-            <span class="kpi-val text-accent" id="kpiAtlDeals">--</span>
+            <span class="kpi-val text-amber" id="kpiPriceDrops">--</span>
+          </div>
+          <div class="kpi-footer">
+            <span class="kpi-subtext">Click to filter price drops</span>
+          </div>
+        </div>
+
+        <!-- 4. All-Time Low Deals -->
+        <div class="kpi-card card-cyan clickable" onclick="filterByAtl()" title="Click to filter All-Time Low deals">
+          <div class="kpi-header">
+            <span class="kpi-title">All-Time Low Deals</span>
+            <div class="kpi-icon-box icon-cyan"><i class="fa-solid fa-tag"></i></div>
+          </div>
+          <div class="kpi-main">
+            <span class="kpi-val text-cyan" id="kpiAtlDeals">--</span>
           </div>
           <div class="kpi-footer">
             <span class="kpi-subtext">Within 1% of 22-Month Low</span>
-          </div>
-        </div>
-
-        <div class="kpi-card">
-          <div class="kpi-header">
-            <span class="kpi-title">Catalog In Stock</span>
-            <div class="kpi-icon-box"><i class="fa-solid fa-circle-check"></i></div>
-          </div>
-          <div class="kpi-main">
-            <span class="kpi-val" id="kpiStockHealth">--</span>
-          </div>
-          <div class="kpi-footer">
-            <span class="kpi-subtext">Active Live Inventory</span>
           </div>
         </div>
       </section>
 
       <!-- Charts & Visual Analytics Section -->
       <section class="charts-section">
-        <div class="chart-card wide-card">
+        <div class="chart-card">
           <div class="chart-card-header">
             <div class="chart-title-box">
               <h2 id="chartTitle">22-Month Price Trajectory & Seasonal Cycles</h2>
-              <p class="chart-subtitle">Historical monthly averages across tracked ASINs</p>
+              <p class="chart-subtitle">Monthly pricing benchmarks across categories from Excel portfolio</p>
             </div>
             <div class="chart-actions">
               <select id="selectChartMetric" class="select-control" onchange="updateChartMetric()">
@@ -176,16 +245,27 @@
             <div class="toolbar-left">
               <div class="search-box">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="inputSearch" placeholder="Search by ASIN, Title, Specs..." oninput="handleSearchInput()">
+                <input type="text" id="inputSearch" placeholder="Search by ASIN, Model, Part No..." oninput="handleSearchInput()">
               </div>
               <select id="selectCategoryFilter" class="select-control" onchange="handleCategoryFilter()">
                 <option value="">All Categories</option>
               </select>
+
+              <!-- Quick Filter Pills -->
+              <div class="filter-pills">
+                <button id="pillFilterAll" class="filter-pill active" onclick="clearPillFilters()">All</button>
+                <button id="pillFilterDrops" class="filter-pill" onclick="togglePriceDropPill()">
+                  <i class="fa-solid fa-fire text-amber"></i> Price Drops
+                </button>
+                <button id="pillFilterAtl" class="filter-pill" onclick="toggleAtlPill()">
+                  <i class="fa-solid fa-star text-emerald"></i> ATL Deals
+                </button>
+              </div>
             </div>
 
             <div class="toolbar-right">
               <span class="table-count" id="tableResultCount">Showing 0 products</span>
-              <button class="btn btn-sm btn-outline" onclick="loadDashboardData()" title="Reload table">
+              <button class="btn btn-sm btn-outline" onclick="loadDashboardData()" title="Reload table data">
                 <i class="fa-solid fa-arrows-rotate"></i>
               </button>
             </div>
@@ -195,15 +275,15 @@
             <table class="data-table" id="productsTable">
               <thead>
                 <tr>
-                  <th style="width: 80px;">Image</th>
-                  <th style="width: 120px;">ASIN</th>
-                  <th>Product Details</th>
-                  <th style="width: 140px;">Category</th>
+                  <th style="width: 70px;">Image</th>
+                  <th style="width: 130px;">ASIN</th>
+                  <th>Product Details & Part No</th>
+                  <th style="width: 170px;">Category</th>
                   <th style="width: 120px;" class="text-right">Today's Price</th>
-                  <th style="width: 110px;" class="text-right">MRP</th>
+                  <th style="width: 100px;" class="text-right">MRP</th>
                   <th style="width: 100px;" class="text-center">Discount</th>
                   <th style="width: 110px;" class="text-center">22-Mo Low</th>
-                  <th style="width: 110px;" class="text-center">Stock</th>
+                  <th style="width: 100px;" class="text-center">Stock</th>
                   <th style="width: 130px;" class="text-center">Actions</th>
                 </tr>
               </thead>
@@ -221,7 +301,7 @@
       <div class="modal-card modal-lg" onclick="event.stopPropagation()">
         <div class="modal-header">
           <div class="modal-title-box">
-            <h3 id="modalProductTitle">Product Timeline & Specs</h3>
+            <h3 id="modalProductTitle">Product Timeline & Analytics</h3>
             <span class="modal-asin-pill" id="modalProductAsin">--</span>
           </div>
           <button class="modal-close-btn" onclick="closeProductModal()">&times;</button>
@@ -238,7 +318,7 @@
         <div class="modal-header">
           <div class="modal-title-box">
             <h3>Add / Import ASINs</h3>
-            <p class="modal-subtitle">Paste your ASINs to track them on the dedicated dashboard</p>
+            <p class="modal-subtitle">Paste ASINs to track them on the selected dashboard</p>
           </div>
           <button class="modal-close-btn" onclick="closeAddAsinModal()">&times;</button>
         </div>
@@ -247,21 +327,19 @@
             <div class="form-group">
               <label for="importGroupSelect">Target Dashboard</label>
               <select id="importGroupSelect" class="form-control">
-                <option value="acer_monitors">🖥️ Acer Monitors Dashboard</option>
-                <option value="other_products">📦 Other Products Dashboard</option>
+                <option value="acer_monitors">🖥️ Acer Monitors & Stands Dashboard</option>
+                <option value="other_products">📦 Other Accessories Dashboard</option>
               </select>
             </div>
 
             <div class="form-group">
               <label for="inputAsinList">Amazon ASIN(s) <span class="help-text">(Single ASIN or comma/newline separated list)</span></label>
-              <textarea id="inputAsinList" class="form-control" rows="4" placeholder="e.g.&#10;B0DWTGH28J&#10;B083BVXY36&#10;B0DZHY5N59" required></textarea>
+              <textarea id="inputAsinList" class="form-control" rows="4" placeholder="e.g.&#10;B0DNNLW8MK&#10;B0DP4M69WM&#10;B0DCW32MB9" required></textarea>
             </div>
 
-            <div class="form-row">
-              <div class="form-group">
-                <label for="inputCustomCategory">Category Tag (Optional)</label>
-                <input type="text" id="inputCustomCategory" class="form-control" placeholder="e.g. Gaming Monitors / Workstations">
-              </div>
+            <div class="form-group">
+              <label for="inputCustomCategory">Category Tag (Optional)</label>
+              <input type="text" id="inputCustomCategory" class="form-control" placeholder="e.g. Wireless Mice / Gaming Headsets">
             </div>
 
             <div class="modal-footer-actions">
@@ -282,16 +360,16 @@
     <!-- Footer -->
     <footer class="app-footer">
       <div class="footer-left">
-        <span>Acer Amazon Price Tracker & Historical Analytics Platform &bull; Monotone Executive v2.0</span>
+        <span>Acer Amazon Price Tracker &bull; 90 Tracked Products from Excel &bull; Enterprise Slate Edition v3.0</span>
       </div>
       <div class="footer-right">
-        <span>Automated Daily Sync: 10:00 AM &bull; Dynamic Real-Time Re-Export</span>
+        <span>Automated Daily Sync: 10:00 AM &bull; Live Real-Time Price Drop Alerts</span>
       </div>
     </footer>
   </div>
 
   <!-- Javascript Modules -->
-  <script src="/js/charts.js?v=3.0.0"></script>
-  <script src="/js/app.js?v=3.0.0"></script>
+  <script src="/js/charts.js?v=4.0.0"></script>
+  <script src="/js/app.js?v=4.0.0"></script>
 </body>
 </html>

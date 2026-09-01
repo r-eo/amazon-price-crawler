@@ -18,7 +18,8 @@ from app.config import (
 from app.database import (
     get_all_products, get_products_by_group, get_product_by_asin,
     get_price_history_for_asin, get_all_price_history, get_product_statistics,
-    delete_product_by_asin
+    delete_product_by_asin, get_recent_price_alerts, mark_alerts_as_read,
+    get_unread_alerts_count
 )
 from app.history_engine import seed_database_if_empty, get_22_month_labels
 from app.scraper import scrape_asin_details, scrape_all_asins
@@ -75,8 +76,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Acer Amazon Price Intelligence Platform",
-    description="Dedicated intelligence dashboards for Acer Monitors and Other Amazon Products with dynamic/daily Excel exports.",
-    version="2.0.0",
+    description="Dedicated intelligence dashboards for Acer Monitors and Other Amazon Products with dynamic/daily Excel exports and Price Drop Notifications.",
+    version="3.0.0",
     lifespan=lifespan
 )
 
@@ -103,7 +104,7 @@ async def add_no_cache_headers(request, call_next):
 def on_startup():
     seed_database_if_empty()
 
-# Pydantic models for ASIN import
+# Pydantic models
 class AddAsinRequest(BaseModel):
     asin: str
     group: str = GROUP_ACER_MONITORS
@@ -116,9 +117,12 @@ class BatchImportRequest(BaseModel):
     group: str = GROUP_ACER_MONITORS
     category: Optional[str] = None
 
+class MarkAlertsRequest(BaseModel):
+    alert_ids: Optional[List[int]] = None
+
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "version": "2.0.0", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "version": "3.0.0", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/scheduler/status")
 def scheduler_status():
@@ -138,13 +142,65 @@ def scheduler_status():
         "excel_auto_updates": True
     }
 
+# =========================================================================
+# Price Drop Alerts & Notifications Endpoints
+# =========================================================================
+
+@app.get("/api/alerts")
+def list_price_alerts(
+    limit: int = Query(50, ge=1, le=200),
+    unread_only: bool = Query(False)
+):
+    """Returns recent price drop alerts."""
+    alerts = get_recent_price_alerts(limit=limit, unread_only=unread_only)
+    unread_cnt = get_unread_alerts_count()
+    return {
+        "alerts": alerts,
+        "unread_count": unread_cnt,
+        "total": len(alerts),
+        "currency": CURRENCY_SYMBOL
+    }
+
+@app.get("/api/alerts/unread-count")
+def unread_alerts_count_endpoint():
+    """Returns count of unread price alerts for the notification bell badge."""
+    return {"unread_count": get_unread_alerts_count()}
+
+@app.post("/api/alerts/mark-read")
+def mark_alerts_read_endpoint(payload: Optional[MarkAlertsRequest] = None):
+    """Marks alerts as read."""
+    ids = payload.alert_ids if payload else None
+    count = mark_alerts_as_read(ids)
+    return {"status": "success", "marked_count": count, "unread_count": get_unread_alerts_count()}
+
+@app.post("/api/check-prices-daily")
+def trigger_daily_price_check(
+    background_tasks: BackgroundTasks,
+    group: Optional[str] = Query(None)
+):
+    """
+    Triggers an instant scan across products to check prices, detect drops,
+    and issue alerts immediately.
+    """
+    background_tasks.add_task(scrape_all_asins, group)
+    grp_name = "Acer Monitors & Stands" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
+    return {
+        "status": "queued",
+        "message": f"Daily price scan initiated for {grp_name}. Notifications will trigger for any detected price drops."
+    }
+
+# =========================================================================
+# Products & Catalog Endpoints
+# =========================================================================
+
 @app.get("/api/products")
 def list_products(
     group: Optional[str] = Query(None),
     category: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    price_drops_only: bool = Query(False)
 ):
-    """Returns list of tracked products filtered by group, category, or search query."""
+    """Returns list of tracked products filtered by group, category, search, or price drops."""
     products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()
@@ -160,6 +216,12 @@ def list_products(
                 continue
                 
         stats = get_product_statistics(p["asin"])
+        if price_drops_only:
+            # Check if there's a recent drop
+            hist = get_price_history_for_asin(p["asin"])
+            if len(hist) < 2 or hist[-1]["price"] >= hist[-2]["price"]:
+                continue
+
         p_dict = dict(p)
         p_dict["stats"] = stats
         results.append(p_dict)
@@ -261,6 +323,8 @@ def get_dashboard_stats(group: Optional[str] = Query(None)):
             "out_of_stock_count": 0,
             "atl_deals_count": 0,
             "near_atl_count": 0,
+            "price_drops_count": 0,
+            "unread_alerts_count": get_unread_alerts_count(),
             "category_breakdown": {},
             "month_labels": get_22_month_labels(),
             "category_trends": {},
@@ -312,7 +376,8 @@ def get_dashboard_stats(group: Optional[str] = Query(None)):
                         "previous_price": prev_price,
                         "current_price": curr_price,
                         "drop_amount": round(drop_amount, 2),
-                        "drop_pct": drop_pct
+                        "drop_pct": drop_pct,
+                        "url": p["url"]
                     })
 
     price_drops.sort(key=lambda x: x["drop_pct"], reverse=True)
@@ -347,7 +412,10 @@ def get_dashboard_stats(group: Optional[str] = Query(None)):
         "out_of_stock_count": out_of_stock_count,
         "atl_deals_count": atl_deals_count,
         "near_atl_count": near_atl_count,
+        "price_drops_count": len(price_drops),
         "top_price_drop": top_drop,
+        "recent_price_drops": price_drops[:10],
+        "unread_alerts_count": get_unread_alerts_count(),
         "category_breakdown": category_breakdown,
         "month_labels": month_labels,
         "category_trends": category_trends,
@@ -370,7 +438,7 @@ def trigger_scrape(
         return {"status": "completed", "result": res}
     else:
         background_tasks.add_task(scrape_all_asins, group)
-        grp_name = "Acer Monitors" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
+        grp_name = "Acer Monitors & Stands" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
         return {
             "status": "queued",
             "message": f"Live Amazon crawl started for {grp_name}. Dashboard will update dynamically."
@@ -399,3 +467,4 @@ def download_excel_export(group: Optional[str] = Query(None)):
 
 # Mount static frontend
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+

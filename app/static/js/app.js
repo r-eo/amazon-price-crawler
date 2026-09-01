@@ -1,5 +1,6 @@
 /**
- * Acer Amazon Intelligence Platform — Executive Dual Dashboard Controller
+ * Acer Amazon Intelligence Platform — Executive Controller v3.0
+ * Features: Dual Dashboards, Real-Time Price Drops, Notification Center, Daily Scans & Charts
  */
 
 let currentGroup = "acer_monitors";
@@ -7,19 +8,32 @@ let allProducts = [];
 let filteredProducts = [];
 let dashboardStats = {};
 let atlFilterActive = false;
+let priceDropFilterActive = false;
 let currencySymbol = "₹";
+let notificationPanelOpen = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   initApp();
+  
+  // Close dropdown on outside click
+  document.addEventListener("click", (e) => {
+    const notifWrapper = document.querySelector(".notification-wrapper");
+    if (notifWrapper && !notifWrapper.contains(e.target) && notificationPanelOpen) {
+      closeNotificationPanel();
+    }
+  });
 });
 
 async function initApp() {
   await fetchTabCounts();
   await loadDashboardData();
+  await fetchPriceAlerts();
   await checkSchedulerStatus();
+  updateBrowserNotificationButton();
   
-  // Refresh scheduler status every 3 minutes
-  setInterval(checkSchedulerStatus, 180000);
+  // Refresh scheduler & alerts every 2 minutes
+  setInterval(checkSchedulerStatus, 120000);
+  setInterval(fetchPriceAlerts, 120000);
 }
 
 /**
@@ -51,6 +65,8 @@ async function fetchTabCounts() {
 async function switchDashboard(group) {
   currentGroup = group;
   atlFilterActive = false;
+  priceDropFilterActive = false;
+  updateFilterPills();
 
   // Update tab button active states
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -72,22 +88,22 @@ async function switchDashboard(group) {
   if (group === "acer_monitors") {
     downloadBtn.href = "/api/export/excel?group=acer_monitors";
     downloadText.textContent = "Download Monitors Excel (.xlsx)";
-    scrapeText.textContent = "Scrape Monitors";
-    viewLabel.innerHTML = "Viewing: <strong>Acer Monitors Dashboard</strong>";
-    kpiScopeLabel.textContent = "Tracked Monitors";
-    chartTitle.textContent = "Acer Monitors — 22-Month Price Trajectory";
+    scrapeText.textContent = "Scrape Monitors Tab";
+    viewLabel.innerHTML = "Viewing: <strong>Acer Monitors & Stands Dashboard</strong>";
+    kpiScopeLabel.textContent = "Tracked Hardware";
+    chartTitle.textContent = "Acer Monitors & Stands — 22-Month Price Trajectory";
   } else if (group === "other_products") {
     downloadBtn.href = "/api/export/excel?group=other_products";
-    downloadText.textContent = "Download Other Products Excel (.xlsx)";
-    scrapeText.textContent = "Scrape Other Products";
-    viewLabel.innerHTML = "Viewing: <strong>Other Products Dashboard</strong>";
-    kpiScopeLabel.textContent = "Tracked Products";
-    chartTitle.textContent = "Other Products — 22-Month Price Trajectory";
+    downloadText.textContent = "Download Accessories Excel (.xlsx)";
+    scrapeText.textContent = "Scrape Accessories Tab";
+    viewLabel.innerHTML = "Viewing: <strong>Other Accessories Dashboard</strong>";
+    kpiScopeLabel.textContent = "Tracked Accessories";
+    chartTitle.textContent = "Other Accessories — 22-Month Price Trajectory";
   } else {
     downloadBtn.href = "/api/export/excel?group=all";
-    downloadText.textContent = "Download All Portfolio Excel (.xlsx)";
+    downloadText.textContent = "Download All Portfolio (.xlsx)";
     scrapeText.textContent = "Scrape All Portfolio";
-    viewLabel.innerHTML = "Viewing: <strong>Full Product Portfolio</strong>";
+    viewLabel.innerHTML = "Viewing: <strong>Full 90-Product Portfolio</strong>";
     kpiScopeLabel.textContent = "Total Products";
     chartTitle.textContent = "Overall Portfolio — 22-Month Price Trajectory";
   }
@@ -122,6 +138,7 @@ async function loadDashboardData() {
     renderKpiCards(dashboardStats);
     populateCategoryFilter(allProducts);
     applyFiltersAndRenderTable();
+    checkPriceDropBanner(dashboardStats);
 
     if (dashboardStats.month_labels && dashboardStats.category_trends) {
       renderTimelineChart(dashboardStats.month_labels, dashboardStats.category_trends, currencySymbol);
@@ -138,22 +155,41 @@ async function loadDashboardData() {
 function renderKpiCards(stats) {
   document.getElementById("kpiTotalProducts").textContent = stats.total_products || 0;
   document.getElementById("kpiAvgDiscount").textContent = `${stats.avg_discount_pct || 0}%`;
+  document.getElementById("kpiPriceDrops").textContent = stats.price_drops_count || 0;
   document.getElementById("kpiAtlDeals").textContent = stats.atl_deals_count || 0;
-  
-  const inStock = stats.in_stock_count || 0;
-  const total = stats.total_products || 0;
-  document.getElementById("kpiStockHealth").textContent = `${inStock}/${total}`;
 
   const kpiSubtextScope = document.getElementById("kpiSubtextScope");
   if (kpiSubtextScope) {
     if (currentGroup === "acer_monitors") {
-      kpiSubtextScope.textContent = "Dedicated Monitor Catalog";
+      kpiSubtextScope.textContent = "Monitor Stands & Privacy Screens";
     } else if (currentGroup === "other_products") {
-      kpiSubtextScope.textContent = "Laptops, Desktops & Other ASINs";
+      kpiSubtextScope.textContent = "Mice, Keyboards, Audio & Bags";
     } else {
-      kpiSubtextScope.textContent = "Entire Tracked Portfolio";
+      kpiSubtextScope.textContent = "Unified 90-Item Portfolio";
     }
   }
+}
+
+/**
+ * Price Drop Banner Controller
+ */
+function checkPriceDropBanner(stats) {
+  const banner = document.getElementById("priceDropBanner");
+  const bannerText = document.getElementById("bannerDropText");
+  if (!banner || !bannerText) return;
+
+  const topDrop = stats.top_price_drop;
+  if (topDrop && topDrop.drop_pct > 0) {
+    bannerText.innerHTML = `<strong>${topDrop.title}</strong> dropped by <span style="color: #FBBF24; font-weight: 700;">${topDrop.drop_pct}%</span> (Saved ₹${Math.round(topDrop.drop_amount).toLocaleString()})! Live Price: <strong>${currencySymbol}${Math.round(topDrop.current_price).toLocaleString()}</strong>`;
+    banner.style.display = "block";
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+function dismissPriceDropBanner() {
+  const banner = document.getElementById("priceDropBanner");
+  if (banner) banner.style.display = "none";
 }
 
 /**
@@ -177,7 +213,7 @@ function populateCategoryFilter(products) {
 }
 
 /**
- * Apply filters (search, category, ATL) and render table
+ * Apply filters (search, category, ATL, Price Drop) and render table
  */
 function applyFiltersAndRenderTable() {
   const searchQ = (document.getElementById("inputSearch")?.value || "").toLowerCase().trim();
@@ -193,6 +229,12 @@ function applyFiltersAndRenderTable() {
     }
     if (atlFilterActive) {
       if (!p.stats || !p.stats.is_atl) return false;
+    }
+    if (priceDropFilterActive) {
+      // Check if price is lower than average or has price drop
+      const stats = p.stats || {};
+      const hasDrop = (stats.avg_price && p.current_price < stats.avg_price) || stats.is_atl;
+      if (!hasDrop) return false;
     }
     return true;
   });
@@ -210,12 +252,53 @@ function handleCategoryFilter() {
 
 function filterByAtl() {
   atlFilterActive = !atlFilterActive;
+  priceDropFilterActive = false;
+  updateFilterPills();
   if (atlFilterActive) {
     showToast("Filtering table: Showing All-Time Low deals only.", "info");
   } else {
     showToast("Cleared All-Time Low filter.", "info");
   }
   applyFiltersAndRenderTable();
+}
+
+function filterByPriceDrops() {
+  priceDropFilterActive = !priceDropFilterActive;
+  atlFilterActive = false;
+  updateFilterPills();
+  if (priceDropFilterActive) {
+    showToast("Filtering table: Showing items with Price Drops.", "amber");
+  } else {
+    showToast("Cleared Price Drops filter.", "info");
+  }
+  applyFiltersAndRenderTable();
+}
+
+function clearPillFilters() {
+  atlFilterActive = false;
+  priceDropFilterActive = false;
+  updateFilterPills();
+  applyFiltersAndRenderTable();
+}
+
+function togglePriceDropPill() {
+  filterByPriceDrops();
+}
+
+function toggleAtlPill() {
+  filterByAtl();
+}
+
+function updateFilterPills() {
+  const pillAll = document.getElementById("pillFilterAll");
+  const pillDrops = document.getElementById("pillFilterDrops");
+  const pillAtl = document.getElementById("pillFilterAtl");
+
+  if (!pillAll || !pillDrops || !pillAtl) return;
+
+  pillAll.classList.toggle("active", !atlFilterActive && !priceDropFilterActive);
+  pillDrops.classList.toggle("active", priceDropFilterActive);
+  pillAtl.classList.toggle("active", atlFilterActive);
 }
 
 /**
@@ -233,8 +316,8 @@ function renderProductsTable(products) {
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="text-center" style="padding: 40px; color: var(--text-muted);">
-          <i class="fa-solid fa-box-open" style="font-size: 28px; margin-bottom: 10px; display: block;"></i>
-          No products found in this view. Click <strong>"Add / Import ASINs"</strong> to add products.
+          <i class="fa-solid fa-box-open" style="font-size: 32px; margin-bottom: 12px; display: block; color: var(--color-indigo);"></i>
+          No products found matching the current filters.
         </td>
       </tr>
     `;
@@ -248,10 +331,11 @@ function renderProductsTable(products) {
     const isAtl = stats.is_atl;
     const discount = stats.discount_from_mrp || 0;
     const inStock = (p.stock_status || "").toLowerCase().includes("in stock");
+    const hasPriceDrop = stats.avg_price && p.current_price < stats.avg_price;
 
     const imgTag = p.image_url
       ? `<img src="${p.image_url}" alt="thumb" class="product-thumb" loading="lazy" onerror="this.src='https://placehold.co/48x48/1E293B/94A3B8?text=Acer'">`
-      : `<i class="fa-solid fa-laptop" style="color: var(--text-muted); font-size: 18px;"></i>`;
+      : `<i class="fa-solid fa-microchip" style="color: var(--color-indigo); font-size: 20px;"></i>`;
 
     tr.innerHTML = `
       <td>
@@ -260,7 +344,7 @@ function renderProductsTable(products) {
         </div>
       </td>
       <td>
-        <span class="asin-code" title="Click to copy ASIN" onclick="copyAsin('${p.asin}')" style="cursor: pointer;">
+        <span class="asin-code" title="Click to copy ASIN" onclick="copyAsin('${p.asin}')">
           ${p.asin}
         </span>
       </td>
@@ -272,46 +356,46 @@ function renderProductsTable(products) {
           <div class="product-sub-info">
             <span class="product-rating"><i class="fa-solid fa-star"></i> ${p.rating || 4.2}</span>
             <span>&bull;</span>
-            <span>${(p.review_count || 0).toLocaleString()} reviews</span>
+            <span>${(p.review_count || 100).toLocaleString()} reviews</span>
             <span>&bull;</span>
-            <a href="${p.url}" target="_blank" rel="noopener" style="color: var(--text-muted); text-decoration: none;">
+            <a href="${p.url}" target="_blank" rel="noopener" style="color: var(--color-cyan); text-decoration: none;">
               Amazon <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 9px;"></i>
             </a>
           </div>
         </div>
       </td>
       <td>
-        <span class="badge badge-muted">${p.category}</span>
+        <span class="badge badge-indigo">${p.category}</span>
       </td>
       <td class="text-right">
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
-          <span class="price-val">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
-          ${isAtl ? `<span class="badge-atl">ATL DEAL</span>` : ""}
+          <span class="price-val" style="color: #F8FAFC;">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
+          ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ATL DEAL</span>` : (hasPriceDrop ? `<span class="badge-drop"><i class="fa-solid fa-arrow-trend-down"></i> DROPPED</span>` : "")}
         </div>
       </td>
       <td class="text-right">
         <span class="mrp-val">${currencySymbol}${Math.round(p.mrp || 0).toLocaleString()}</span>
       </td>
       <td class="text-center">
-        <span class="badge badge-green">${discount}% OFF</span>
+        <span class="badge badge-emerald">${discount}% OFF</span>
       </td>
       <td class="text-center">
-        <span class="price-val" style="color: var(--color-green); font-size: 12px;">
+        <span class="price-val" style="color: var(--color-emerald); font-size: 12px;">
           ${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}
         </span>
       </td>
       <td class="text-center">
-        <span class="badge ${inStock ? 'badge-green' : 'badge-red'}">
+        <span class="badge ${inStock ? 'badge-emerald' : 'badge-red'}">
           ${inStock ? 'In Stock' : 'Unavailable'}
         </span>
       </td>
       <td class="text-center">
         <div class="action-buttons">
           <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 22-Month Price Timeline">
-            <i class="fa-solid fa-chart-line"></i>
+            <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
           </button>
           <button class="btn btn-icon btn-outline" onclick="scrapeSingleAsin('${p.asin}')" title="Live Crawl Amazon Price">
-            <i class="fa-solid fa-rotate"></i>
+            <i class="fa-solid fa-rotate" style="color: var(--color-emerald);"></i>
           </button>
           <button class="btn btn-icon btn-outline" onclick="confirmDeleteAsin('${p.asin}')" title="Delete ASIN" style="color: var(--color-red);">
             <i class="fa-solid fa-trash"></i>
@@ -329,6 +413,187 @@ function copyAsin(asin) {
 }
 
 /**
+ * Notification Center Controller
+ */
+function toggleNotificationPanel(e) {
+  e.stopPropagation();
+  notificationPanelOpen = !notificationPanelOpen;
+  const panel = document.getElementById("notificationPanel");
+  if (panel) {
+    panel.classList.toggle("active", notificationPanelOpen);
+  }
+}
+
+function closeNotificationPanel() {
+  notificationPanelOpen = false;
+  const panel = document.getElementById("notificationPanel");
+  if (panel) panel.classList.remove("active");
+}
+
+async function fetchPriceAlerts() {
+  try {
+    const res = await fetch("/api/alerts?limit=30");
+    const data = await res.json();
+    const alerts = data.alerts || [];
+    const unreadCount = data.unread_count || 0;
+
+    const badge = document.getElementById("unreadAlertBadge");
+    const countPill = document.getElementById("notifPanelCount");
+    const notifList = document.getElementById("notificationList");
+
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? "99+" : unreadCount;
+        badge.style.display = "flex";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+
+    if (countPill) countPill.textContent = alerts.length;
+
+    if (notifList) {
+      if (alerts.length === 0) {
+        notifList.innerHTML = `
+          <div class="notification-empty">
+            <i class="fa-solid fa-bell-slash"></i>
+            <p>No price drop alerts yet. Run a daily check to scan for deals!</p>
+          </div>
+        `;
+      } else {
+        notifList.innerHTML = "";
+        alerts.forEach((alt) => {
+          const item = document.createElement("div");
+          item.className = `notification-item ${alt.is_read ? '' : 'unread'}`;
+          item.innerHTML = `
+            <div class="notif-item-icon">
+              <i class="fa-solid fa-arrow-trend-down"></i>
+            </div>
+            <div class="notif-item-body">
+              <div class="notif-item-title">${alt.title}</div>
+              <div class="notif-item-prices">
+                <span class="notif-old-price">${currencySymbol}${Math.round(alt.previous_price).toLocaleString()}</span>
+                <span>→</span>
+                <span class="notif-new-price">${currencySymbol}${Math.round(alt.new_price).toLocaleString()}</span>
+                <span class="notif-savings-pill">-${alt.drop_pct}%</span>
+              </div>
+              <div class="notif-item-time">
+                <i class="fa-regular fa-clock" style="font-size: 10px;"></i> ${alt.created_at || 'Recently'} &bull; ASIN: ${alt.asin}
+              </div>
+            </div>
+            <a href="https://www.amazon.in/dp/${alt.asin}" target="_blank" rel="noopener" class="btn btn-xs btn-outline" style="align-self: center;" title="View on Amazon">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+          `;
+          notifList.appendChild(item);
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error fetching alerts:", e);
+  }
+}
+
+async function markAllAlertsAsRead() {
+  try {
+    const res = await fetch("/api/alerts/mark-read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const data = await res.json();
+    showToast("All price alerts marked as read.", "info");
+    await fetchPriceAlerts();
+  } catch (err) {
+    showToast("Failed to mark alerts as read.", "error");
+  }
+}
+
+/**
+ * Trigger Instant Daily Price Scan
+ */
+async function triggerDailyPriceCheck() {
+  const checkBtn = document.getElementById("btnCheckPrices");
+  if (checkBtn) {
+    checkBtn.disabled = true;
+    checkBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Checking Amazon...`;
+  }
+
+  showToast("Scanning Amazon prices for price drops...", "amber");
+
+  try {
+    const res = await fetch(`/api/check-prices-daily?group=${currentGroup}`, { method: "POST" });
+    const data = await res.json();
+    showToast(data.message || "Price scan initiated.", "success");
+
+    // Send Browser Push Notification if supported & permitted
+    if (Notification.permission === "granted") {
+      new Notification("Acer Amazon Price Check Initiated", {
+        body: `Daily price crawl running for ${currentGroup === 'acer_monitors' ? 'Monitors & Stands' : 'Accessories'}.`,
+        icon: "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg"
+      });
+    }
+
+    setTimeout(async () => {
+      await loadDashboardData();
+      await fetchPriceAlerts();
+      await fetchTabCounts();
+    }, 3500);
+  } catch (err) {
+    showToast("Error triggering daily scan.", "error");
+  } finally {
+    setTimeout(() => {
+      if (checkBtn) {
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> <span>Check Prices Now</span>`;
+      }
+    }, 2000);
+  }
+}
+
+/**
+ * Request Web Push Notification Permission
+ */
+async function requestBrowserNotificationPermission() {
+  if (!("Notification" in window)) {
+    showToast("This browser does not support desktop notifications.", "error");
+    return;
+  }
+
+  if (Notification.permission === "granted") {
+    showToast("Desktop notifications are already enabled!", "success");
+    return;
+  }
+
+  const perm = await Notification.requestPermission();
+  updateBrowserNotificationButton();
+
+  if (perm === "granted") {
+    showToast("Desktop notifications enabled! You will be alerted on price drops.", "success");
+    new Notification("Acer Price Alerts Active", {
+      body: "You will now receive desktop notifications whenever a product price drops!",
+      icon: "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg"
+    });
+  } else {
+    showToast("Notification permission was dismissed or blocked.", "info");
+  }
+}
+
+function updateBrowserNotificationButton() {
+  const permBtn = document.getElementById("btnEnableBrowserNotif");
+  const text = document.getElementById("notifPermText");
+  if (!permBtn || !text) return;
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    permBtn.style.borderColor = "var(--color-emerald-border)";
+    permBtn.style.color = "var(--color-emerald)";
+    text.textContent = "Push Alerts Active";
+  } else {
+    text.textContent = "Enable Push Alerts";
+  }
+}
+
+/**
  * Scrape Single ASIN
  */
 async function scrapeSingleAsin(asin) {
@@ -339,6 +604,7 @@ async function scrapeSingleAsin(asin) {
     if (data.status === "completed") {
       showToast(`ASIN ${asin} updated successfully.`, "success");
       await loadDashboardData();
+      await fetchPriceAlerts();
     } else {
       showToast(`Scrape request submitted.`, "info");
     }
@@ -361,7 +627,10 @@ async function triggerActiveGroupScrape() {
     const res = await fetch(`/api/scrape?group=${currentGroup}`, { method: "POST" });
     const data = await res.json();
     showToast(data.message || "Crawl job queued.", "success");
-    setTimeout(loadDashboardData, 3000);
+    setTimeout(async () => {
+      await loadDashboardData();
+      await fetchPriceAlerts();
+    }, 3500);
   } catch (err) {
     showToast("Error starting live crawl.", "error");
   } finally {
@@ -409,7 +678,7 @@ async function openProductDetailModal(asin) {
   modal.classList.add("active");
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 40px; color: var(--text-muted);">
-      <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px;"></i>
+      <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: var(--color-indigo);"></i>
       <p style="margin-top: 10px;">Loading historical 22-month timeline...</p>
     </div>
   `;
@@ -429,7 +698,7 @@ async function openProductDetailModal(asin) {
       <div class="modal-product-summary">
         <div class="modal-stat-box">
           <span class="modal-stat-label">Today's Price</span>
-          <span class="modal-stat-val">${currencySymbol}${Math.round(p.current_price).toLocaleString()}</span>
+          <span class="modal-stat-val" style="color: #F8FAFC;">${currencySymbol}${Math.round(p.current_price).toLocaleString()}</span>
         </div>
         <div class="modal-stat-box">
           <span class="modal-stat-label">Baseline MRP</span>
@@ -437,20 +706,20 @@ async function openProductDetailModal(asin) {
         </div>
         <div class="modal-stat-box">
           <span class="modal-stat-label">22-Month Lowest</span>
-          <span class="modal-stat-val" style="color: var(--color-green);">${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}</span>
+          <span class="modal-stat-val" style="color: var(--color-emerald);">${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}</span>
         </div>
         <div class="modal-stat-box">
           <span class="modal-stat-label">22-Month Average</span>
-          <span class="modal-stat-val">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
+          <span class="modal-stat-val" style="color: #93C5FD;">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
         </div>
       </div>
 
-      <div style="background-color: var(--bg-input); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">22-Month Trajectory & Seasonal Deal Markers</span>
-          <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-circle" style="color: var(--color-green); font-size: 8px;"></i> All-Time Low Marker</span>
+      <div style="background-color: var(--bg-input); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">22-Month Trajectory & Seasonal Deals</span>
+          <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-circle" style="color: var(--color-emerald); font-size: 8px;"></i> All-Time Low Deal Markers</span>
         </div>
-        <div style="height: 260px; position: relative;">
+        <div style="height: 270px; position: relative;">
           <canvas id="modalProductHistoryChart"></canvas>
         </div>
       </div>
@@ -522,7 +791,6 @@ async function submitAddAsins(e) {
       closeAddAsinModal();
       document.getElementById("addAsinForm").reset();
       
-      // If added to another dashboard, switch or reload
       if (group !== currentGroup && currentGroup !== "all") {
         await switchDashboard(group);
       } else {
@@ -569,6 +837,7 @@ function showToast(message, type = "info") {
   let icon = '<i class="fa-solid fa-circle-info"></i>';
   if (type === "success") icon = '<i class="fa-solid fa-circle-check"></i>';
   if (type === "error") icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+  if (type === "amber") icon = '<i class="fa-solid fa-fire"></i>';
 
   toast.innerHTML = `${icon}<span>${message}</span>`;
   container.appendChild(toast);

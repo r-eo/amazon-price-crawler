@@ -1,18 +1,20 @@
 /**
- * Executive Monotone Visual Analytics & Chart.js Controllers
+ * Cyber & Slate Visual Analytics & Chart.js Controllers v3.0
+ * Multi-Color Palette: Indigo (#6366F1), Emerald (#10B981), Amber (#F59E0B), Cyan (#06B6D4), Purple (#A855F7), Rose (#F43F5E)
  */
 
 let timelineChartInstance = null;
 let modalProductChartInstance = null;
 
-// Executive Muted Palette
-const MONOTONE_PALETTE = [
-  { line: "#E2E8F0", bg: "rgba(226, 232, 240, 0.08)" }, // Silver
-  { line: "#38BDF8", bg: "rgba(56, 189, 248, 0.08)" },  // Steel Sky
-  { line: "#94A3B8", bg: "rgba(148, 163, 184, 0.08)" }, // Slate Gray
-  { line: "#818CF8", bg: "rgba(129, 140, 248, 0.08)" }, // Indigo Slate
-  { line: "#34D399", bg: "rgba(52, 211, 153, 0.08)" },  // Muted Mint
-  { line: "#F59E0B", bg: "rgba(245, 158, 11, 0.08)" },  // Bronze Amber
+const CYBER_PALETTE = [
+  { line: "#6366F1", bg: "rgba(99, 102, 241, 0.12)" }, // Royal Indigo
+  { line: "#10B981", bg: "rgba(16, 185, 129, 0.12)" }, // Acer Emerald
+  { line: "#F59E0B", bg: "rgba(245, 158, 11, 0.12)" }, // Sunset Amber
+  { line: "#06B6D4", bg: "rgba(6, 182, 212, 0.12)" },  // Cyber Cyan
+  { line: "#A855F7", bg: "rgba(168, 85, 247, 0.12)" }, // Electric Purple
+  { line: "#F43F5E", bg: "rgba(244, 63, 94, 0.12)" },  // Coral Rose
+  { line: "#38BDF8", bg: "rgba(56, 189, 248, 0.12)" }, // Sky Blue
+  { line: "#84CC16", bg: "rgba(132, 204, 22, 0.12)" }, // Lime
 ];
 
 function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹") {
@@ -21,20 +23,20 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
 
   const categories = Object.keys(categoryTrends);
   const datasets = categories.map((cat, idx) => {
-    const style = MONOTONE_PALETTE[idx % MONOTONE_PALETTE.length];
+    const style = CYBER_PALETTE[idx % CYBER_PALETTE.length];
     return {
       label: cat,
       data: categoryTrends[cat],
       borderColor: style.line,
       backgroundColor: style.bg,
-      borderWidth: 2,
-      tension: 0.3,
-      pointRadius: 2.5,
-      pointHoverRadius: 5,
+      borderWidth: 2.5,
+      tension: 0.35,
+      pointRadius: 3,
+      pointHoverRadius: 6,
       pointBackgroundColor: style.line,
-      pointBorderColor: "#090D16",
+      pointBorderColor: "#0F172A",
       pointBorderWidth: 1.5,
-      fill: false,
+      fill: true,
     };
   });
 
@@ -60,21 +62,22 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
           position: "top",
           align: "end",
           labels: {
-            color: "#94A3B8",
-            font: { family: "Inter", size: 11, weight: "500" },
+            color: "#CBD5E1",
+            font: { family: "Inter", size: 11, weight: "600" },
             usePointStyle: true,
-            boxWidth: 6,
-            boxHeight: 6,
+            boxWidth: 7,
+            boxHeight: 7,
+            padding: 14,
           },
         },
         tooltip: {
-          backgroundColor: "#141B2A",
+          backgroundColor: "#151E33",
           titleColor: "#F8FAFC",
           bodyColor: "#CBD5E1",
-          borderColor: "#28354A",
+          borderColor: "#22304D",
           borderWidth: 1,
-          padding: 10,
-          boxPadding: 4,
+          padding: 12,
+          boxPadding: 6,
           usePointStyle: true,
           callbacks: {
             label: function (context) {
@@ -90,9 +93,9 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.03)" },
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
           ticks: {
-            color: "#64748B",
+            color: "#94A3B8",
             font: { family: "Inter", size: 10 },
             maxRotation: 0,
             autoSkip: true,
@@ -100,9 +103,9 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
           },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.03)" },
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
           ticks: {
-            color: "#64748B",
+            color: "#94A3B8",
             font: { family: "Inter", size: 10 },
             callback: function (val) {
               return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);
@@ -114,6 +117,86 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
   });
 }
 
+function updateChartMetric() {
+  const metric = document.getElementById("selectChartMetric")?.value;
+  if (!dashboardStats.month_labels) return;
+
+  if (metric === "portfolio") {
+    // Render single weighted average portfolio line
+    const ctx = document.getElementById("timelineChart");
+    if (!ctx) return;
+
+    const monthLabels = dashboardStats.month_labels;
+    const catTrends = dashboardStats.category_trends || {};
+    const categories = Object.keys(catTrends);
+
+    const portfolioAvg = monthLabels.map((_, mIdx) => {
+      let sum = 0, count = 0;
+      categories.forEach(cat => {
+        const val = catTrends[cat][mIdx];
+        if (val) { sum += val; count++; }
+      });
+      return count > 0 ? Math.round(sum / count) : 0;
+    });
+
+    if (timelineChartInstance) timelineChartInstance.destroy();
+
+    timelineChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: monthLabels,
+        datasets: [{
+          label: "Overall Portfolio Benchmark",
+          data: portfolioAvg,
+          borderColor: "#6366F1",
+          backgroundColor: "rgba(99, 102, 241, 0.18)",
+          borderWidth: 3,
+          tension: 0.35,
+          pointRadius: 4,
+          pointBackgroundColor: "#6366F1",
+          pointBorderColor: "#FFFFFF",
+          pointBorderWidth: 2,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "top",
+            align: "end",
+            labels: { color: "#CBD5E1", font: { family: "Inter", size: 11, weight: "600" } }
+          },
+          tooltip: {
+            backgroundColor: "#151E33",
+            titleColor: "#F8FAFC",
+            bodyColor: "#CBD5E1",
+            borderColor: "#22304D",
+            borderWidth: 1,
+            padding: 12,
+            callbacks: {
+              label: (ctx) => `Portfolio Avg: ${currencySymbol}${Math.round(ctx.parsed.y).toLocaleString()}`
+            }
+          }
+        },
+        scales: {
+          x: { grid: { color: "rgba(255, 255, 255, 0.05)" }, ticks: { color: "#94A3B8" } },
+          y: {
+            grid: { color: "rgba(255, 255, 255, 0.05)" },
+            ticks: {
+              color: "#94A3B8",
+              callback: (val) => currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val)
+            }
+          }
+        }
+      }
+    });
+  } else {
+    renderTimelineChart(dashboardStats.month_labels, dashboardStats.category_trends, currencySymbol);
+  }
+}
+
 function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
   const ctx = document.getElementById("modalProductHistoryChart");
   if (!ctx) return;
@@ -123,9 +206,9 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
   const minPrice = Math.min(...prices);
 
   const pointBackgrounds = historyPoints.map((h) =>
-    h.price === minPrice ? "#10B981" : (h.is_sale ? "#38BDF8" : "#E2E8F0")
+    h.price === minPrice ? "#10B981" : (h.is_sale ? "#F59E0B" : "#6366F1")
   );
-  const pointRadii = historyPoints.map((h) => (h.price === minPrice ? 5 : 2.5));
+  const pointRadii = historyPoints.map((h) => (h.price === minPrice ? 6 : (h.is_sale ? 4 : 3)));
 
   if (modalProductChartInstance) {
     modalProductChartInstance.destroy();
@@ -139,15 +222,15 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
         {
           label: "Price History",
           data: prices,
-          borderColor: "#E2E8F0",
-          backgroundColor: "rgba(226, 232, 240, 0.05)",
-          borderWidth: 2,
-          tension: 0.25,
+          borderColor: "#6366F1",
+          backgroundColor: "rgba(99, 102, 241, 0.12)",
+          borderWidth: 2.5,
+          tension: 0.3,
           pointBackgroundColor: pointBackgrounds,
-          pointBorderColor: "#090D16",
-          pointBorderWidth: 1.5,
+          pointBorderColor: "#0F172A",
+          pointBorderWidth: 2,
           pointRadius: pointRadii,
-          pointHoverRadius: 6,
+          pointHoverRadius: 7,
           fill: true,
         },
       ],
@@ -158,16 +241,16 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "#141B2A",
+          backgroundColor: "#151E33",
           titleColor: "#F8FAFC",
           bodyColor: "#CBD5E1",
-          borderColor: "#28354A",
+          borderColor: "#22304D",
           borderWidth: 1,
-          padding: 10,
+          padding: 12,
           callbacks: {
             label: function (context) {
               const h = historyPoints[context.dataIndex];
-              let str = "Price: " + currencySymbol + h.price.toLocaleString();
+              let str = "Price: " + currencySymbol + Math.round(h.price).toLocaleString();
               if (h.price === minPrice) str += " ★ ALL-TIME LOW";
               if (h.sale_tag) str += ` (${h.sale_tag})`;
               return str;
@@ -177,13 +260,13 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.03)" },
-          ticks: { color: "#64748B", font: { size: 10 }, maxTicksLimit: 11 },
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          ticks: { color: "#94A3B8", font: { size: 10 }, maxTicksLimit: 11 },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.03)" },
+          grid: { color: "rgba(255, 255, 255, 0.05)" },
           ticks: {
-            color: "#64748B",
+            color: "#94A3B8",
             font: { size: 10 },
             callback: function (val) {
               return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);

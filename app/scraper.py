@@ -11,7 +11,7 @@ from app.config import (
 )
 from app.database import (
     upsert_product, add_price_history_batch, get_product_by_asin,
-    get_products_by_group, get_all_products
+    get_products_by_group, get_all_products, record_price_alert
 )
 from app.seed_data import ACER_SEED_PRODUCTS
 from app.history_engine import seed_custom_asin_timeline
@@ -24,11 +24,15 @@ def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
     """Returns baseline metadata from verified seed catalog if database record is missing."""
     for p in ACER_SEED_PRODUCTS:
         if p["asin"] == asin:
+            grp = p.get("product_group")
+            if not grp:
+                cat = p.get("category", "").lower()
+                grp = GROUP_ACER_MONITORS if ("stand" in cat or "screen" in cat or "monitor" in cat) else GROUP_OTHER_PRODUCTS
             return {
                 "asin": p["asin"],
                 "title": p["title"],
                 "category": p["category"],
-                "product_group": p.get("product_group", GROUP_ACER_MONITORS if "monitor" in p["category"].lower() else GROUP_OTHER_PRODUCTS),
+                "product_group": grp,
                 "mrp": p["mrp"],
                 "current_price": p["base_price"],
                 "currency": "INR",
@@ -36,7 +40,7 @@ def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
                 "rating": p.get("rating", 4.2),
                 "review_count": p.get("review_count", 100),
                 "image_url": p.get("image_url"),
-                "url": f"{BASE_AMAZON_URL}/dp/{asin}",
+                "url": p.get("amazon_link") or f"{BASE_AMAZON_URL}/dp/{asin}",
                 "last_scraped_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
     return None
@@ -64,7 +68,7 @@ def fetch_page_content(url: str) -> Optional[str]:
             headers=DEFAULT_HEADERS,
             impersonate="chrome124",
             timeout=15,
-            follow_redirects=True
+            allow_redirects=True
         )
         if response.status_code == 200:
             return response.text
@@ -266,8 +270,22 @@ def scrape_asin_details(
     else:
         upsert_product(updated_product)
 
-    # Check if price changed
+    # Check if price changed or dropped
     price_changed = (prev_price is not None and abs(prev_price - final_price) > 0.01)
+    price_dropped = (prev_price is not None and final_price < prev_price - 0.01)
+    drop_info = None
+
+    if price_dropped:
+        drop_info = record_price_alert(
+            asin=asin,
+            title=final_title,
+            category=target_category,
+            product_group=target_group,
+            previous_price=prev_price,
+            new_price=final_price,
+            timestamp=now_str
+        )
+        logger.info(f"PRICE DROP ALERT: ASIN {asin} dropped from ₹{prev_price} to ₹{final_price}!")
 
     # Append live point to history
     add_price_history_batch([{
@@ -275,8 +293,8 @@ def scrape_asin_details(
         "timestamp": datetime.now().strftime("%Y-%m-%d"),
         "month_label": datetime.now().strftime("%b %Y"),
         "price": final_price,
-        "is_sale": 0,
-        "sale_tag": "Live Crawl",
+        "is_sale": 1 if price_dropped else 0,
+        "sale_tag": "Price Drop" if price_dropped else "Live Crawl",
         "source": "live_scraper"
     }])
 
@@ -284,8 +302,10 @@ def scrape_asin_details(
         "asin": asin,
         "success": True,
         "price_changed": price_changed,
+        "price_dropped": price_dropped,
         "previous_price": prev_price,
         "new_price": final_price,
+        "drop_info": drop_info,
         "message": f"Updated ASIN {asin} (Price: {final_price})",
         "data": updated_product
     }
@@ -293,7 +313,7 @@ def scrape_asin_details(
 def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
     """
     Scrapes all tracked products for a specific group or full portfolio.
-    If any price change is detected, triggers auto-regeneration of the group Excel export.
+    Detects price drops, creates notification alerts, and triggers Excel auto-regeneration.
     """
     from app.excel_exporter import export_excel_by_group
     from app.history_engine import seed_database_if_empty
@@ -305,6 +325,7 @@ def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
 
     results = []
     any_price_changed = False
+    price_drops_found = []
 
     for p in products:
         asin = p["asin"]
@@ -313,21 +334,24 @@ def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
         results.append(res)
         if res.get("price_changed"):
             any_price_changed = True
-        time.sleep(1.0)
+        if res.get("price_dropped") and res.get("drop_info"):
+            price_drops_found.append(res.get("drop_info"))
+        time.sleep(0.5)
 
-    # Dynamic Trigger: If prices changed, regenerate the Excel files immediately
-    if any_price_changed or True: # always ensure up-to-date after batch run
-        try:
-            target_grp = group or GROUP_ALL
-            export_excel_by_group(target_grp)
-            logger.info(f"Dynamic Excel export auto-regenerated for group '{target_grp}'.")
-        except Exception as e:
-            logger.error(f"Failed to auto-export Excel: {e}")
+    # Dynamic Trigger: Ensure fresh Excel export
+    try:
+        target_grp = group or GROUP_ALL
+        export_excel_by_group(target_grp)
+        logger.info(f"Dynamic Excel export auto-regenerated for group '{target_grp}'.")
+    except Exception as e:
+        logger.error(f"Failed to auto-export Excel: {e}")
 
     return {
         "total": len(products),
         "group": group or "all",
         "any_price_changed": any_price_changed,
+        "price_drops_count": len(price_drops_found),
+        "price_drops": price_drops_found,
         "results": results,
         "completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }

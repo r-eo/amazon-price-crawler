@@ -5,7 +5,8 @@ from app.config import BASE_AMAZON_URL, HISTORY_MONTHS_COUNT, CURRENCY_CODE, GRO
 from app.seed_data import ACER_SEED_PRODUCTS
 from app.database import (
     init_db, upsert_product, add_price_history_batch,
-    get_all_products, get_price_history_for_asin, clear_all_products_and_history
+    get_all_products, get_price_history_for_asin, clear_all_products_and_history,
+    record_price_alert
 )
 
 # Known e-commerce sale events by month (1 to 12)
@@ -69,7 +70,7 @@ def generate_22_month_history(base_price: float, mrp: float, end_date: datetime 
         
         # Round to neat 90s or 99s typical of Amazon pricing
         clean_price = round(calculated_price / 10) * 10 - (1 if rng.random() > 0.5 else 10)
-        clean_price = round(max(float(clean_price), 499.0), 2)
+        clean_price = round(max(float(clean_price), 299.0), 2)
 
         records.append({
             "timestamp": timestamp,
@@ -114,7 +115,7 @@ def seed_database_if_empty(force: bool = False):
     seed_asins = {p["asin"] for p in ACER_SEED_PRODUCTS}
     
     # If forced or if existing products do not match current seed ASINs, reseed
-    if force or existing_asins != seed_asins:
+    if force or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
     elif existing_products and len(existing_products) >= len(ACER_SEED_PRODUCTS):
         # Already populated and matching
@@ -125,19 +126,25 @@ def seed_database_if_empty(force: bool = False):
 
     for item in ACER_SEED_PRODUCTS:
         asin = item["asin"]
-        url = f"{BASE_AMAZON_URL}/dp/{asin}"
+        url = item.get("amazon_link") or f"{BASE_AMAZON_URL}/dp/{asin}"
         
         # Generate 22 months of history
         history_points = generate_22_month_history(item["base_price"], item["mrp"], end_date=now)
         
         # Today's price is the latest generated price point
         todays_price = history_points[-1]["price"]
+        prev_month_price = history_points[-2]["price"] if len(history_points) >= 2 else todays_price
+
+        grp = item.get("product_group")
+        if not grp:
+            cat = item.get("category", "").lower()
+            grp = GROUP_ACER_MONITORS if ("stand" in cat or "screen" in cat or "monitor" in cat) else GROUP_OTHER_PRODUCTS
 
         product_data = {
             "asin": asin,
             "title": item["title"],
             "category": item["category"],
-            "product_group": item.get("product_group", GROUP_ACER_MONITORS if "monitor" in item["category"].lower() else GROUP_OTHER_PRODUCTS),
+            "product_group": grp,
             "mrp": item["mrp"],
             "current_price": todays_price,
             "currency": CURRENCY_CODE,
@@ -167,6 +174,22 @@ def seed_database_if_empty(force: bool = False):
         # Insert history records
         add_price_history_batch(db_history_records)
 
+        # If a price drop occurred recently in the timeline, record an alert
+        for idx in range(len(history_points) - 1, max(0, len(history_points) - 4), -1):
+            curr_p = history_points[idx]["price"]
+            prev_p = history_points[idx - 1]["price"]
+            if curr_p < prev_p - 10:
+                record_price_alert(
+                    asin=asin,
+                    title=item["title"],
+                    category=item["category"],
+                    product_group=grp,
+                    previous_price=prev_p,
+                    new_price=curr_p,
+                    timestamp=history_points[idx]["timestamp"]
+                )
+                break
+
     return len(ACER_SEED_PRODUCTS)
 
 def get_22_month_labels() -> List[str]:
@@ -177,3 +200,4 @@ def get_22_month_labels() -> List[str]:
         point_date = now - timedelta(days=int(i * 30.4375))
         labels.append(point_date.strftime("%b %Y"))
     return labels
+
