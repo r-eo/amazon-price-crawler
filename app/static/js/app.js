@@ -737,6 +737,9 @@ async function openProductDetailModal(asin) {
 }
 
 function closeProductModal(e) {
+  if (e && e.target && e.target !== document.getElementById("productDetailModal") && !e.target.classList.contains("modal-close-btn")) {
+    return;
+  }
   const modal = document.getElementById("productDetailModal");
   if (modal) modal.classList.remove("active");
 }
@@ -754,9 +757,23 @@ function openAddAsinModal() {
 }
 
 function closeAddAsinModal(e) {
+  if (e && e.target && e.target !== document.getElementById("addAsinModal") && !e.target.classList.contains("modal-close-btn") && e.target.tagName !== "BUTTON") {
+    return;
+  }
   const modal = document.getElementById("addAsinModal");
   if (modal) modal.classList.remove("active");
+  const form = document.getElementById("addAsinForm");
+  if (form) form.reset();
 }
+
+// Global Escape Key Listener for Modals & Panels
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeAddAsinModal();
+    closeProductModal();
+    closeNotificationPanel();
+  }
+});
 
 async function submitAddAsins(e) {
   e.preventDefault();

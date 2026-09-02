@@ -1282,12 +1282,16 @@ body {
   inset: 0;
   background-color: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(4px);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 3000;
   padding: 20px;
   animation: fadeIn 0.2s ease-out;
+}
+
+.modal-backdrop.active {
+  display: flex;
 }
 
 @keyframes fadeIn {
