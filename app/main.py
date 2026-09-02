@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -19,7 +20,7 @@ from app.database import (
     get_all_products, get_products_by_group, get_product_by_asin,
     get_price_history_for_asin, get_all_price_history, get_product_statistics,
     delete_product_by_asin, get_recent_price_alerts, mark_alerts_as_read,
-    get_unread_alerts_count
+    get_unread_alerts_count, reconcile_and_repair_corrupted_data
 )
 from app.history_engine import seed_database_if_empty, get_22_month_labels
 from app.scraper import scrape_asin_details, scrape_all_asins
@@ -33,6 +34,61 @@ logger = logging.getLogger("tracker_app")
 # Automated Daily Crawl Schedule (Default: 10:00 AM)
 DAILY_SCHEDULE_HOUR = int(os.getenv("DAILY_SCHEDULE_HOUR", 10))
 DAILY_SCHEDULE_MINUTE = int(os.getenv("DAILY_SCHEDULE_MINUTE", 0))
+
+_last_auto_sync_lock = threading.Lock()
+_last_auto_sync_time: Optional[datetime] = None
+
+def check_and_auto_sync_if_stale(force: bool = False):
+    """
+    Checks if products data has not been scraped in the last 24 hours.
+    If stale (or on cold start after 10 AM if missed), automatically triggers
+    a refresh to ensure live data is always up to date.
+    Throttled to run at most once per 2 hours.
+    """
+    global _last_auto_sync_time
+    now = datetime.now()
+    if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 7200 and not force:
+        return
+
+    if not _last_auto_sync_lock.acquire(blocking=False):
+        return
+
+    try:
+        if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 7200 and not force:
+            return
+        
+        products = get_all_products()
+        if not products:
+            return
+
+        is_stale = False
+        scraped_dates = [p.get("last_scraped_at") for p in products if p.get("last_scraped_at")]
+        if not scraped_dates:
+            is_stale = True
+        else:
+            latest_str = max(scraped_dates)
+            try:
+                latest_dt = datetime.strptime(latest_str, "%Y-%m-%d %H:%M:%S")
+                if (now - latest_dt).total_seconds() > 86400:
+                    is_stale = True
+                elif now.hour >= DAILY_SCHEDULE_HOUR and latest_dt.date() < now.date():
+                    is_stale = True
+            except Exception:
+                is_stale = True
+
+        if is_stale or force:
+            _last_auto_sync_time = now
+            logger.info("Auto-sync: Detected stale product data (>24h or missed today's 10 AM run). Launching background refresh...")
+            try:
+                scrape_all_asins(GROUP_ACER_MONITORS)
+                export_monitors_excel()
+                export_other_products_excel()
+                export_all_portfolio_excel()
+                logger.info("Auto-sync background refresh completed successfully.")
+            except Exception as ex:
+                logger.error(f"Auto-sync background refresh failed: {ex}")
+    finally:
+        _last_auto_sync_lock.release()
 
 async def daily_10am_scheduler_loop():
     """
@@ -68,8 +124,10 @@ async def daily_10am_scheduler_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initializes database on startup and starts the 10:00 AM daily background worker."""
+    """Initializes database, runs data integrity check, auto-refreshes if stale, and starts daily scheduler."""
     seed_database_if_empty()
+    reconcile_and_repair_corrupted_data()
+    asyncio.create_task(asyncio.to_thread(check_and_auto_sync_if_stale))
     scheduler_task = asyncio.create_task(daily_10am_scheduler_loop())
     yield
     scheduler_task.cancel()
@@ -99,10 +157,6 @@ async def add_no_cache_headers(request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
-
-@app.on_event("startup")
-def on_startup():
-    seed_database_if_empty()
 
 # Pydantic models
 class AddAsinRequest(BaseModel):
@@ -195,12 +249,14 @@ def trigger_daily_price_check(
 
 @app.get("/api/products")
 def list_products(
+    background_tasks: BackgroundTasks,
     group: Optional[str] = Query(None),
     category: Optional[str] = None,
     search: Optional[str] = None,
     price_drops_only: bool = Query(False)
 ):
     """Returns list of tracked products filtered by group, category, search, or price drops."""
+    background_tasks.add_task(check_and_auto_sync_if_stale)
     products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()
@@ -307,8 +363,12 @@ def delete_product(asin: str, background_tasks: BackgroundTasks):
     return {"status": "success", "message": f"Deleted ASIN {clean_asin}."}
 
 @app.get("/api/stats")
-def get_dashboard_stats(group: Optional[str] = Query(None)):
+def get_dashboard_stats(
+    background_tasks: BackgroundTasks,
+    group: Optional[str] = Query(None)
+):
     """Calculates overall statistics and KPI aggregations for the requested dashboard group."""
+    background_tasks.add_task(check_and_auto_sync_if_stale)
     products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()

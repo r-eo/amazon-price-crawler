@@ -345,3 +345,91 @@ def get_product_statistics(asin: str) -> Dict[str, Any]:
             "is_atl": is_atl,
             "is_near_atl": is_near_atl,
         }
+
+def reconcile_and_repair_corrupted_data() -> Dict[str, Any]:
+    """
+    Scans products, price history, and price alerts tables to detect and repair
+    any records corrupted by previous crawls (e.g. price > mrp, mrp < 250, or huge outliers).
+    Restores valid catalog baselines from ACER_SEED_PRODUCTS.
+    """
+    from app.seed_data import ACER_SEED_PRODUCTS
+    seed_map = {p["asin"]: p for p in ACER_SEED_PRODUCTS}
+    
+    repaired_products = []
+    removed_history = 0
+    removed_alerts = 0
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT asin, title, current_price, mrp, stock_status FROM products")
+        products = cursor.fetchall()
+        
+        for p in products:
+            asin = p["asin"]
+            cur_price = p["current_price"]
+            cur_mrp = p["mrp"]
+            seed = seed_map.get(asin)
+            
+            needs_repair = False
+            fix_price = cur_price
+            fix_mrp = cur_mrp
+            
+            # Condition 1: Selling price exceeds MRP
+            if cur_price and cur_mrp and cur_price > cur_mrp:
+                needs_repair = True
+            
+            # Condition 2: Absurdly low MRP (< 250) on monitors/stands/hardware
+            if cur_mrp and cur_mrp < 250:
+                needs_repair = True
+                
+            # Condition 3: Check against verified seed if available
+            if seed:
+                seed_mrp = seed.get("mrp", 0)
+                seed_price = seed.get("base_price", 0)
+                if cur_price and seed_mrp and cur_price > (seed_mrp * 1.15):
+                    needs_repair = True
+                if cur_mrp and seed_mrp and cur_mrp < (seed_mrp * 0.25):
+                    needs_repair = True
+                if needs_repair:
+                    fix_mrp = seed_mrp if seed_mrp else cur_mrp
+                    fix_price = seed_price if seed_price else (fix_mrp * 0.75)
+            elif needs_repair:
+                if cur_mrp and cur_price > cur_mrp:
+                    fix_price = round(cur_mrp * 0.8, 2)
+            
+            if needs_repair:
+                cursor.execute("""
+                    UPDATE products 
+                    SET current_price = ?, mrp = ?
+                    WHERE asin = ?
+                """, (fix_price, fix_mrp, asin))
+                repaired_products.append({
+                    "asin": asin,
+                    "old_price": cur_price,
+                    "new_price": fix_price,
+                    "old_mrp": cur_mrp,
+                    "new_mrp": fix_mrp
+                })
+                
+                # Delete corrupted history spikes for this ASIN
+                if fix_mrp:
+                    cursor.execute("DELETE FROM price_history WHERE asin = ? AND price > ?", (asin, fix_mrp * 1.15))
+                    removed_history += cursor.rowcount
+                
+                # Delete corrupted alerts
+                if fix_mrp:
+                    cursor.execute("""
+                        DELETE FROM price_alerts 
+                        WHERE asin = ? AND (new_price > ? OR previous_price > ?)
+                    """, (asin, fix_mrp * 1.15, fix_mrp * 1.15))
+                    removed_alerts += cursor.rowcount
+                    
+        conn.commit()
+        
+    return {
+        "repaired_count": len(repaired_products),
+        "repaired_products": repaired_products,
+        "removed_corrupt_history": removed_history,
+        "removed_corrupt_alerts": removed_alerts
+    }
+

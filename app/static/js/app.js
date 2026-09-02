@@ -293,12 +293,15 @@ function updateFilterPills() {
   const pillAll = document.getElementById("pillFilterAll");
   const pillDrops = document.getElementById("pillFilterDrops");
   const pillAtl = document.getElementById("pillFilterAtl");
+  const cardDrops = document.getElementById("kpiCardPriceDrops");
+  const cardAtl = document.getElementById("kpiCardAtl");
 
-  if (!pillAll || !pillDrops || !pillAtl) return;
+  if (pillAll) pillAll.classList.toggle("active", !atlFilterActive && !priceDropFilterActive);
+  if (pillDrops) pillDrops.classList.toggle("active", priceDropFilterActive);
+  if (pillAtl) pillAtl.classList.toggle("active", atlFilterActive);
 
-  pillAll.classList.toggle("active", !atlFilterActive && !priceDropFilterActive);
-  pillDrops.classList.toggle("active", priceDropFilterActive);
-  pillAtl.classList.toggle("active", atlFilterActive);
+  if (cardDrops) cardDrops.classList.toggle("active-filter", priceDropFilterActive);
+  if (cardAtl) cardAtl.classList.toggle("active-filter", atlFilterActive);
 }
 
 /**

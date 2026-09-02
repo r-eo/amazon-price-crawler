@@ -167,53 +167,121 @@ def scrape_asin_details(
     elif existing:
         title = existing.get("title")
 
-    # 2. Live Price Extraction
-    price = None
-    price_selectors = [
-        ".priceToPay span.a-offscreen",
-        ".apexPriceToPay span.a-offscreen",
-        "#corePrice_feature_div .a-price .a-offscreen",
-        "#corePriceDisplay_desktop_feature_div .a-price .a-offscreen",
-        "#priceblock_ourprice",
-        "#priceblock_dealprice",
-        "#priceblock_saleprice",
-        "span.a-price-whole",
+    # 2. Main Product Container & Out-of-Stock Detection
+    center_col = soup.select_one("#centerCol") or soup.select_one("#desktop_buybox") or soup.select_one("#apex_desktop") or soup.select_one("#ppd")
+    
+    stock_status = "In Stock"
+    avail_blocks = [
+        soup.select_one("#availability"),
+        soup.select_one("#outOfStock"),
+        soup.select_one("#outOfStockBuyBox_feature_div"),
+        soup.select_one("#availabilityInsideBuyBox_feature_div")
     ]
-    for sel in price_selectors:
-        elem = soup.select_one(sel)
-        if elem:
-            extracted = parse_price(elem.get_text())
-            if extracted:
-                price = extracted
+    for ab in avail_blocks:
+        if ab:
+            txt = ab.get_text().strip().lower()
+            if "currently unavailable" in txt or "out of stock" in txt or "we don't know when or if" in txt or "temporarily out of stock" in txt:
+                stock_status = "Out of Stock"
                 break
+            elif "left in stock" in txt:
+                stock_status = ab.get_text().strip()
 
-    # 3. MRP Extraction
+    # 3. Live Price Extraction (Strictly scoped within buybox / centerCol to prevent carousel pollution)
+    price = None
+    if stock_status != "Out of Stock":
+        # Priority 1: Check hidden buybox price input (most accurate on Amazon India)
+        buybox = soup.select_one("#desktop_buybox") or soup.select_one("#buybox")
+        if buybox:
+            hidden_price_elem = buybox.select_one('input[name*="customerVisiblePrice"][name*="amount"]')
+            if hidden_price_elem and hidden_price_elem.get("value"):
+                try:
+                    val = float(hidden_price_elem.get("value"))
+                    if val > 0:
+                        price = val
+                except ValueError:
+                    pass
+
+        # Priority 2: Target specific buybox/core price blocks
+        if not price:
+            target_blocks = [
+                soup.select_one("#corePriceDisplay_desktop_feature_div"),
+                soup.select_one("#corePrice_feature_div"),
+                soup.select_one("#apex_desktop"),
+                soup.select_one("#desktop_buybox"),
+                soup.select_one("#buybox"),
+                center_col
+            ]
+            
+            price_selectors = [
+                ".priceToPay span.a-offscreen",
+                ".apexPriceToPay span.a-offscreen",
+                ".reinventPricePriceToPayMargin .a-price-whole",
+                ".priceToPay .a-price-whole",
+                ".apexPriceToPay .a-price-whole",
+                "#priceblock_dealprice",
+                "#priceblock_ourprice",
+                "#priceblock_saleprice",
+                ".a-price:not(.a-text-price) span.a-offscreen",
+                "span.apex-pricetopay-value",
+            ]
+            for block in target_blocks:
+                if not block:
+                    continue
+                for sel in price_selectors:
+                    elem = block.select_one(sel)
+                    if elem:
+                        val = parse_price(elem.get_text())
+                        if val and val > 0:
+                            price = val
+                            break
+                if price:
+                    break
+
+    # 4. MRP Extraction (Strictly within center_col / main area)
     mrp = custom_mrp
-    if not mrp:
+    if not mrp and center_col:
         mrp_selectors = [
+            ".apex-basisprice-value .a-offscreen",
             ".basisPrice .a-offscreen",
             "span.a-price.a-text-price .a-offscreen",
             "#corePrice_desktop .a-text-price .a-offscreen",
+            ".apex-basisprice-value",
+            ".basisPrice .a-price-whole"
         ]
         for sel in mrp_selectors:
-            elem = soup.select_one(sel)
+            elem = center_col.select_one(sel)
             if elem:
                 extracted = parse_price(elem.get_text())
-                if extracted:
+                if extracted and extracted > 0:
                     mrp = extracted
                     break
 
-    # 4. Stock Availability
-    stock_status = "In Stock"
-    avail_elem = soup.select_one("#availability span")
-    if avail_elem:
-        avail_text = avail_elem.get_text().strip().lower()
-        if "currently unavailable" in avail_text or "out of stock" in avail_text:
-            stock_status = "Out of Stock"
-        elif "left in stock" in avail_text:
-            stock_status = avail_elem.get_text().strip()
+    # Safeguard MRP: Never overwrite a verified catalog MRP with a ridiculously low fraction
+    existing_mrp = existing.get("mrp") if existing else None
+    if existing_mrp and existing_mrp > 0:
+        if not mrp or mrp < (existing_mrp * 0.25):
+            mrp = existing_mrp
 
-    # 5. Rating and Reviews
+    # 5. Price Sanity Validation
+    baseline_mrp = mrp or existing_mrp
+    if price and baseline_mrp and baseline_mrp > 0:
+        if price > (baseline_mrp * 1.15):
+            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (>1.15x). Retaining previous price.")
+            price = existing.get("current_price") if existing else baseline_mrp
+        elif price < (baseline_mrp * 0.10):
+            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (<0.10x). Retaining previous price.")
+            price = existing.get("current_price") if existing else baseline_mrp
+
+    # Secondary sanity check against previous verified price
+    if price and prev_price and prev_price > 0:
+        if price > (prev_price * 2.2):
+            logger.warning(f"ASIN {asin}: Scraped price {price} surged >220% over previous {prev_price}. Retaining previous price.")
+            price = prev_price
+        elif price < (prev_price * 0.20):
+            logger.warning(f"ASIN {asin}: Scraped price {price} plummeted >80% below previous {prev_price}. Retaining previous price.")
+            price = prev_price
+
+    # 6. Rating and Reviews
     rating = existing.get("rating", 4.2) if existing else 4.2
     rating_elem = soup.select_one("#acrPopover span.a-icon-alt")
     if rating_elem:
@@ -234,7 +302,7 @@ def scrape_asin_details(
             except ValueError:
                 pass
 
-    # 6. Image
+    # 7. Image
     image_url = existing.get("image_url") if existing else None
     img_elem = soup.select_one("#landingImage, #imgBlkFront")
     if img_elem and img_elem.get("src"):
