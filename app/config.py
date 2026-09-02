@@ -57,3 +57,7 @@ EXCEL_MONITORS_FILENAME = "Acer_Monitors_Price_Tracker.xlsx"
 EXCEL_OTHER_FILENAME = "Other_Products_Price_Tracker.xlsx"
 EXCEL_ALL_FILENAME = "All_Products_Price_Tracker.xlsx"
 
+# Automated Daily Crawl Schedule (3 intervals daily starting at 9:00 AM, every 4 hours: 9 AM, 1 PM, 5 PM)
+SYNC_INTERVAL_HOURS = [9, 13, 17]
+
+

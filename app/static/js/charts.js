@@ -7,14 +7,14 @@ let timelineChartInstance = null;
 let modalProductChartInstance = null;
 
 const CYBER_PALETTE = [
-  { line: "#6366F1", bg: "rgba(99, 102, 241, 0.12)" }, // Royal Indigo
-  { line: "#10B981", bg: "rgba(16, 185, 129, 0.12)" }, // Acer Emerald
-  { line: "#F59E0B", bg: "rgba(245, 158, 11, 0.12)" }, // Sunset Amber
-  { line: "#06B6D4", bg: "rgba(6, 182, 212, 0.12)" },  // Cyber Cyan
-  { line: "#A855F7", bg: "rgba(168, 85, 247, 0.12)" }, // Electric Purple
-  { line: "#F43F5E", bg: "rgba(244, 63, 94, 0.12)" },  // Coral Rose
-  { line: "#38BDF8", bg: "rgba(56, 189, 248, 0.12)" }, // Sky Blue
-  { line: "#84CC16", bg: "rgba(132, 204, 22, 0.12)" }, // Lime
+  { line: "#4F46E5", bg: "rgba(79, 70, 229, 0.08)" }, // Astra Indigo
+  { line: "#059669", bg: "rgba(5, 150, 105, 0.08)" }, // Emerald
+  { line: "#D97706", bg: "rgba(217, 119, 6, 0.08)" }, // Amber
+  { line: "#0284C7", bg: "rgba(2, 132, 199, 0.08)" },  // Sky/Cyan
+  { line: "#9333EA", bg: "rgba(147, 51, 234, 0.08)" }, // Purple
+  { line: "#E11D48", bg: "rgba(225, 29, 72, 0.08)" },  // Rose
+  { line: "#0D9488", bg: "rgba(13, 148, 136, 0.08)" }, // Teal
+  { line: "#65A30D", bg: "rgba(101, 163, 13, 0.08)" }, // Lime
 ];
 
 function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹") {
@@ -29,12 +29,12 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
       data: categoryTrends[cat],
       borderColor: style.line,
       backgroundColor: style.bg,
-      borderWidth: 2.5,
+      borderWidth: 2.2,
       tension: 0.35,
       pointRadius: 3,
       pointHoverRadius: 6,
       pointBackgroundColor: style.line,
-      pointBorderColor: "#0F172A",
+      pointBorderColor: "#FFFFFF",
       pointBorderWidth: 1.5,
       fill: true,
     };
@@ -62,7 +62,7 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
           position: "top",
           align: "end",
           labels: {
-            color: "#CBD5E1",
+            color: "#334155",
             font: { family: "Inter", size: 11, weight: "600" },
             usePointStyle: true,
             boxWidth: 7,
@@ -71,10 +71,10 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
           },
         },
         tooltip: {
-          backgroundColor: "#151E33",
-          titleColor: "#F8FAFC",
-          bodyColor: "#CBD5E1",
-          borderColor: "#22304D",
+          backgroundColor: "#FFFFFF",
+          titleColor: "#0F172A",
+          bodyColor: "#334155",
+          borderColor: "#E2E8F0",
           borderWidth: 1,
           padding: 12,
           boxPadding: 6,
@@ -93,9 +93,9 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          grid: { color: "#F1F5F9" },
           ticks: {
-            color: "#94A3B8",
+            color: "#64748B",
             font: { family: "Inter", size: 10 },
             maxRotation: 0,
             autoSkip: true,
@@ -103,9 +103,9 @@ function renderTimelineChart(monthLabels, categoryTrends, currencySymbol = "₹"
           },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          grid: { color: "#F1F5F9" },
           ticks: {
-            color: "#94A3B8",
+            color: "#64748B",
             font: { family: "Inter", size: 10 },
             callback: function (val) {
               return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);
@@ -222,12 +222,12 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
         {
           label: "Price History",
           data: prices,
-          borderColor: "#6366F1",
-          backgroundColor: "rgba(99, 102, 241, 0.12)",
-          borderWidth: 2.5,
+          borderColor: "#4F46E5",
+          backgroundColor: "rgba(79, 70, 229, 0.08)",
+          borderWidth: 2.2,
           tension: 0.3,
           pointBackgroundColor: pointBackgrounds,
-          pointBorderColor: "#0F172A",
+          pointBorderColor: "#FFFFFF",
           pointBorderWidth: 2,
           pointRadius: pointRadii,
           pointHoverRadius: 7,
@@ -241,10 +241,10 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "#151E33",
-          titleColor: "#F8FAFC",
-          bodyColor: "#CBD5E1",
-          borderColor: "#22304D",
+          backgroundColor: "#FFFFFF",
+          titleColor: "#0F172A",
+          bodyColor: "#334155",
+          borderColor: "#E2E8F0",
           borderWidth: 1,
           padding: 12,
           callbacks: {
@@ -260,13 +260,13 @@ function renderProductDetailModalChart(historyPoints, currencySymbol = "₹") {
       },
       scales: {
         x: {
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
-          ticks: { color: "#94A3B8", font: { size: 10 }, maxTicksLimit: 11 },
+          grid: { color: "#F1F5F9" },
+          ticks: { color: "#64748B", font: { size: 10 }, maxTicksLimit: 11 },
         },
         y: {
-          grid: { color: "rgba(255, 255, 255, 0.05)" },
+          grid: { color: "#F1F5F9" },
           ticks: {
-            color: "#94A3B8",
+            color: "#64748B",
             font: { size: 10 },
             callback: function (val) {
               return currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val);

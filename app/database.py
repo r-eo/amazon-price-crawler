@@ -386,6 +386,9 @@ def reconcile_and_repair_corrupted_data() -> Dict[str, Any]:
             if seed:
                 seed_mrp = seed.get("mrp", 0)
                 seed_price = seed.get("base_price", 0)
+                # If database MRP is substantially higher than verified seed MRP (> 20% mismatch)
+                if cur_mrp and seed_mrp and cur_mrp > (seed_mrp * 1.20):
+                    needs_repair = True
                 if cur_price and seed_mrp and cur_price > (seed_mrp * 1.15):
                     needs_repair = True
                 if cur_mrp and seed_mrp and cur_mrp < (seed_mrp * 0.25):

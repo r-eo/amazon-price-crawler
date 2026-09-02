@@ -14,7 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import (
     STATIC_DIR, CURRENCY_SYMBOL,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
-    EXCEL_MONITORS_FILENAME, EXCEL_OTHER_FILENAME, EXCEL_ALL_FILENAME
+    EXCEL_MONITORS_FILENAME, EXCEL_OTHER_FILENAME, EXCEL_ALL_FILENAME,
+    SYNC_INTERVAL_HOURS
 )
 from app.database import (
     get_all_products, get_products_by_group, get_product_by_asin,
@@ -31,30 +32,45 @@ from app.excel_exporter import (
 
 logger = logging.getLogger("tracker_app")
 
-# Automated Daily Crawl Schedule (Default: 10:00 AM)
-DAILY_SCHEDULE_HOUR = int(os.getenv("DAILY_SCHEDULE_HOUR", 10))
-DAILY_SCHEDULE_MINUTE = int(os.getenv("DAILY_SCHEDULE_MINUTE", 0))
-
 _last_auto_sync_lock = threading.Lock()
 _last_auto_sync_time: Optional[datetime] = None
 
+def get_next_sync_target(now: Optional[datetime] = None) -> datetime:
+    """Calculates next scheduled sync timestamp from the 3 daily intervals (9:00 AM, 1:00 PM, 5:00 PM)."""
+    now = now or datetime.now()
+    for h in sorted(SYNC_INTERVAL_HOURS):
+        target = now.replace(hour=h, minute=0, second=0, microsecond=0)
+        if target > now:
+            return target
+    tomorrow = now + timedelta(days=1)
+    return tomorrow.replace(hour=sorted(SYNC_INTERVAL_HOURS)[0], minute=0, second=0, microsecond=0)
+
+def get_most_recent_scheduled_sync(now: Optional[datetime] = None) -> datetime:
+    """Finds the most recent sync milestone that should have occurred."""
+    now = now or datetime.now()
+    passed_today = [h for h in sorted(SYNC_INTERVAL_HOURS) if now.hour >= h]
+    if passed_today:
+        return now.replace(hour=max(passed_today), minute=0, second=0, microsecond=0)
+    yesterday = now - timedelta(days=1)
+    return yesterday.replace(hour=sorted(SYNC_INTERVAL_HOURS)[-1], minute=0, second=0, microsecond=0)
+
 def check_and_auto_sync_if_stale(force: bool = False):
     """
-    Checks if products data has not been scraped in the last 24 hours.
-    If stale (or on cold start after 10 AM if missed), automatically triggers
-    a refresh to ensure live data is always up to date.
-    Throttled to run at most once per 2 hours.
+    Checks if products data has missed the most recent scheduled 4-hour sync window.
+    If stale (or on cold start after a scheduled milestone), automatically triggers
+    a background refresh to ensure live data integrity.
+    Throttled to run at most once per 70 minutes.
     """
     global _last_auto_sync_time
     now = datetime.now()
-    if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 7200 and not force:
+    if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 4200 and not force:
         return
 
     if not _last_auto_sync_lock.acquire(blocking=False):
         return
 
     try:
-        if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 7200 and not force:
+        if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 4200 and not force:
             return
         
         products = get_all_products()
@@ -69,52 +85,53 @@ def check_and_auto_sync_if_stale(force: bool = False):
             latest_str = max(scraped_dates)
             try:
                 latest_dt = datetime.strptime(latest_str, "%Y-%m-%d %H:%M:%S")
-                if (now - latest_dt).total_seconds() > 86400:
+                recent_milestone = get_most_recent_scheduled_sync(now)
+                if latest_dt < recent_milestone and (now - recent_milestone).total_seconds() > 300:
                     is_stale = True
-                elif now.hour >= DAILY_SCHEDULE_HOUR and latest_dt.date() < now.date():
+                elif (now - latest_dt).total_seconds() > 21600:
                     is_stale = True
             except Exception:
                 is_stale = True
 
         if is_stale or force:
             _last_auto_sync_time = now
-            logger.info("Auto-sync: Detected stale product data (>24h or missed today's 10 AM run). Launching background refresh...")
+            logger.info("Auto-sync: Detected stale data past scheduled milestone. Launching refresh...")
             try:
                 scrape_all_asins(GROUP_ACER_MONITORS)
+                scrape_all_asins(GROUP_OTHER_PRODUCTS)
                 export_monitors_excel()
                 export_other_products_excel()
                 export_all_portfolio_excel()
-                logger.info("Auto-sync background refresh completed successfully.")
+                logger.info("Auto-sync refresh completed successfully.")
             except Exception as ex:
-                logger.error(f"Auto-sync background refresh failed: {ex}")
+                logger.error(f"Auto-sync refresh failed: {ex}")
     finally:
         _last_auto_sync_lock.release()
 
-async def daily_10am_scheduler_loop():
+async def scheduled_sync_loop():
     """
-    Background worker that runs automatically every day at 10:00 AM to crawl
-    all Acer Monitors and Other Products and pre-generate the fresh daily 22-Month Excel reports.
+    Background worker that runs automatically every 4 hours daily across 3 intervals:
+    9:00 AM, 1:00 PM, and 5:00 PM. Crawls products and pre-generates daily 22-Month Excel reports.
     """
-    logger.info(f"Daily automated scheduler active: target sync at {DAILY_SCHEDULE_HOUR:02d}:{DAILY_SCHEDULE_MINUTE:02d}.")
+    logger.info(f"Daily automated scheduler active: 3 intervals at {', '.join(f'{h:02d}:00' for h in SYNC_INTERVAL_HOURS)}.")
     while True:
         try:
             now = datetime.now()
-            target_time = now.replace(hour=DAILY_SCHEDULE_HOUR, minute=DAILY_SCHEDULE_MINUTE, second=0, microsecond=0)
-            if target_time <= now:
-                target_time += timedelta(days=1)
-                
-            delay_seconds = (target_time - now).total_seconds()
-            logger.info(f"Daily scheduler: next automated run at {target_time.strftime('%Y-%m-%d %H:%M:%S')} (in {int(delay_seconds//60)} minutes).")
+            target_time = get_next_sync_target(now)
+            delay_seconds = max(5, (target_time - now).total_seconds())
+            hours, remainder = divmod(int(delay_seconds), 3600)
+            minutes, _ = divmod(remainder, 60)
+            logger.info(f"Daily scheduler: next automated run at {target_time.strftime('%Y-%m-%d %H:%M:%S')} (in {hours}h {minutes}m).")
             
             await asyncio.sleep(delay_seconds)
             
-            logger.info("Executing scheduled 10:00 AM daily Amazon crawl & dual Excel generation...")
+            logger.info(f"Executing scheduled {target_time.strftime('%I:%M %p')} crawl & Excel generation...")
             await asyncio.to_thread(scrape_all_asins, GROUP_ACER_MONITORS)
             await asyncio.to_thread(scrape_all_asins, GROUP_OTHER_PRODUCTS)
             await asyncio.to_thread(export_monitors_excel)
             await asyncio.to_thread(export_other_products_excel)
             await asyncio.to_thread(export_all_portfolio_excel)
-            logger.info("Scheduled 10:00 AM daily crawl & Excel generation completed successfully.")
+            logger.info("Scheduled crawl & Excel generation completed successfully.")
             
         except asyncio.CancelledError:
             break
@@ -124,11 +141,11 @@ async def daily_10am_scheduler_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initializes database, runs data integrity check, auto-refreshes if stale, and starts daily scheduler."""
+    """Initializes database, runs data integrity check, auto-refreshes if stale, and starts 3-interval daily scheduler."""
     seed_database_if_empty()
     reconcile_and_repair_corrupted_data()
     asyncio.create_task(asyncio.to_thread(check_and_auto_sync_if_stale))
-    scheduler_task = asyncio.create_task(daily_10am_scheduler_loop())
+    scheduler_task = asyncio.create_task(scheduled_sync_loop())
     yield
     scheduler_task.cancel()
 
@@ -180,18 +197,20 @@ def health_check():
 
 @app.get("/api/scheduler/status")
 def scheduler_status():
-    """Returns status and next execution time of the automated daily 10:00 AM sync."""
+    """Returns status and next execution time of the 3-interval daily sync schedule (9 AM, 1 PM, 5 PM)."""
     now = datetime.now()
-    target_time = now.replace(hour=DAILY_SCHEDULE_HOUR, minute=DAILY_SCHEDULE_MINUTE, second=0, microsecond=0)
-    if target_time <= now:
-        target_time += timedelta(days=1)
+    target_time = get_next_sync_target(now)
     diff = target_time - now
-    hours, remainder = divmod(int(diff.total_seconds()), 3600)
+    hours, remainder = divmod(max(0, int(diff.total_seconds())), 3600)
     minutes, _ = divmod(remainder, 60)
     
+    formatted_time = target_time.strftime("%I:%M %p").lstrip("0")
+    
     return {
-        "daily_schedule": f"Every day at {DAILY_SCHEDULE_HOUR:02d}:{DAILY_SCHEDULE_MINUTE:02d}",
+        "schedule_type": "3 Daily Intervals",
+        "intervals": ["9:00 AM", "1:00 PM", "5:00 PM"],
         "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "next_time_display": formatted_time,
         "time_remaining": f"{hours}h {minutes}m",
         "excel_auto_updates": True
     }
@@ -240,7 +259,49 @@ def trigger_daily_price_check(
     grp_name = "Acer Monitors & Stands" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
     return {
         "status": "queued",
-        "message": f"Daily price scan initiated for {grp_name}. Notifications will trigger for any detected price drops."
+        "message": f"Price scan initiated for {grp_name}. Notifications will trigger for any detected price drops."
+    }
+
+@app.post("/api/scrape")
+def api_scrape_endpoint(
+    background_tasks: BackgroundTasks,
+    asin: Optional[str] = Query(None),
+    group: Optional[str] = Query(None)
+):
+    """
+    Crawls Amazon live for a single ASIN synchronously or an entire group asynchronously.
+    """
+    if asin:
+        clean_asin = asin.strip().upper()
+        res = scrape_asin_details(asin=clean_asin)
+        prod = get_product_by_asin(clean_asin)
+        if prod:
+            background_tasks.add_task(export_excel_by_group, prod.get("product_group", GROUP_ACER_MONITORS))
+        return {
+            "status": "completed" if res.get("success") else "failed",
+            "asin": clean_asin,
+            "data": res.get("data"),
+            "message": res.get("message")
+        }
+    
+    background_tasks.add_task(scrape_all_asins, group)
+    return {
+        "status": "queued",
+        "message": f"Crawl job queued for {group or 'all products'}."
+    }
+
+@app.api_route("/api/cron/sync", methods=["GET", "POST"])
+def vercel_cron_sync(background_tasks: BackgroundTasks):
+    """Vercel Cron endpoint triggered at 9 AM, 1 PM, 5 PM IST (every 4 hours)."""
+    background_tasks.add_task(scrape_all_asins, GROUP_ACER_MONITORS)
+    background_tasks.add_task(scrape_all_asins, GROUP_OTHER_PRODUCTS)
+    background_tasks.add_task(export_monitors_excel)
+    background_tasks.add_task(export_other_products_excel)
+    background_tasks.add_task(export_all_portfolio_excel)
+    return {
+        "status": "success",
+        "message": "3-Interval sync triggered via cron across all products.",
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 # =========================================================================

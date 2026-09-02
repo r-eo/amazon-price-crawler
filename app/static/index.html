@@ -23,88 +23,114 @@
 <body>
   <div class="app-layout">
     
-    <!-- Top Executive Header -->
+    <!-- Top Executive Header (Astra / Hello Elementor Layout) -->
     <header class="top-nav">
-      <div class="nav-left">
-        <div class="brand-logo">
-          <i class="fa-solid fa-chart-line"></i>
-        </div>
-        <div class="brand-info">
-          <div class="brand-title-row">
-            <h1>ACER <span>INTELLIGENCE</span></h1>
-            <span class="env-badge">ENTERPRISE v3.0</span>
+      <div class="nav-container">
+        <div class="nav-left">
+          <div class="brand-logo">
+            <i class="fa-solid fa-chart-line"></i>
           </div>
-          <p class="brand-desc">Amazon Dual Dashboard &bull; Daily Price Drop Alerts &bull; 22-Month Historical Analytics</p>
-        </div>
-      </div>
-
-      <div class="nav-right">
-        <!-- Live Scheduler Status -->
-        <div class="status-indicator" title="Automated Daily Crawl & Excel Sync Scheduled at 10:00 AM">
-          <span class="status-dot"></span>
-          <span id="schedulerStatusText">Daily 10:00 AM Sync</span>
+          <div class="brand-info">
+            <div class="brand-title-row">
+              <h1>ACER <span>INTELLIGENCE</span></h1>
+              <span class="env-badge">ENTERPRISE v3.0</span>
+            </div>
+            <p class="brand-desc">Amazon Dual Dashboard &bull; 3-Interval Daily Sync (9 AM, 1 PM, 5 PM) &bull; 22-Month History</p>
+          </div>
         </div>
 
-        <!-- Notification Bell with Unread Badge & Dropdown -->
-        <div class="notification-wrapper">
-          <button id="btnNotificationBell" class="btn btn-icon btn-outline notification-bell-btn" onclick="toggleNotificationPanel(event)" title="Price Drop Notifications">
-            <i class="fa-solid fa-bell"></i>
-            <span id="unreadAlertBadge" class="notification-badge" style="display: none;">0</span>
-          </button>
+        <div class="nav-center">
+          <!-- Segmented Tab Switcher Integrated in Navbar -->
+          <div class="tab-switcher">
+            <button class="tab-btn active" data-group="acer_monitors" onclick="switchDashboard('acer_monitors')">
+              <i class="fa-solid fa-display"></i>
+              <span>Acer Monitors</span>
+              <span class="tab-badge" id="badgeMonitorsCount">--</span>
+            </button>
+            <button class="tab-btn" data-group="other_products" onclick="switchDashboard('other_products')">
+              <i class="fa-solid fa-boxes-stacked"></i>
+              <span>Other Accessories</span>
+              <span class="tab-badge" id="badgeOtherCount">--</span>
+            </button>
+            <button class="tab-btn" data-group="all" onclick="switchDashboard('all')">
+              <i class="fa-solid fa-layer-group"></i>
+              <span>All Portfolio</span>
+              <span class="tab-badge" id="badgeAllCount">--</span>
+            </button>
+          </div>
+        </div>
 
-          <!-- Notification Dropdown Panel -->
-          <div id="notificationPanel" class="notification-dropdown" onclick="event.stopPropagation()">
-            <div class="notification-header">
-              <div class="notif-title">
-                <i class="fa-solid fa-bolt text-amber"></i>
-                <span>Price Drop Alerts</span>
-                <span class="notif-count-pill" id="notifPanelCount">0</span>
+        <div class="nav-right">
+          <!-- Live 3-Interval Scheduler Status -->
+          <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every 4 hours: 9:00 AM, 1:00 PM, and 5:00 PM">
+            <span class="status-dot"></span>
+            <span id="schedulerStatusText">Sync: 9 AM, 1 PM, 5 PM</span>
+          </div>
+
+          <!-- Notification Bell with Unread Badge & Dropdown -->
+          <div class="notification-wrapper">
+            <button id="btnNotificationBell" class="btn btn-icon btn-outline notification-bell-btn" onclick="toggleNotificationPanel(event)" title="Price Drop Notifications">
+              <i class="fa-solid fa-bell"></i>
+              <span id="unreadAlertBadge" class="notification-badge" style="display: none;">0</span>
+            </button>
+
+            <!-- Notification Dropdown Panel -->
+            <div id="notificationPanel" class="notification-dropdown" onclick="event.stopPropagation()">
+              <div class="notification-header">
+                <div class="notif-title">
+                  <i class="fa-solid fa-bolt text-amber"></i>
+                  <span>Price Drop Alerts</span>
+                  <span class="notif-count-pill" id="notifPanelCount">0</span>
+                </div>
+                <div class="notif-actions">
+                  <button class="btn-link" onclick="markAllAlertsAsRead()" title="Mark all alerts as read">
+                    <i class="fa-solid fa-check-double"></i> Mark all read
+                  </button>
+                </div>
               </div>
-              <div class="notif-actions">
-                <button class="btn-link" onclick="markAllAlertsAsRead()" title="Mark all alerts as read">
-                  <i class="fa-solid fa-check-double"></i> Mark all read
+              
+              <div class="notification-list" id="notificationList">
+                <div class="notification-empty">
+                  <i class="fa-solid fa-bell-slash"></i>
+                  <p>No price drop alerts yet. Run a daily check to scan for deals!</p>
+                </div>
+              </div>
+
+              <div class="notification-footer">
+                <button class="btn btn-xs btn-primary full-width" onclick="triggerDailyPriceCheck()">
+                  <i class="fa-solid fa-magnifying-glass-dollar"></i> Scan Amazon Prices Now
                 </button>
               </div>
             </div>
-            
-            <div class="notification-list" id="notificationList">
-              <div class="notification-empty">
-                <i class="fa-solid fa-bell-slash"></i>
-                <p>No price drop alerts yet. Run a daily check to scan for deals!</p>
-              </div>
-            </div>
+          </div>
 
-            <div class="notification-footer">
-              <button class="btn btn-xs btn-primary full-width" onclick="triggerDailyPriceCheck()">
-                <i class="fa-solid fa-magnifying-glass-dollar"></i> Scan Amazon Prices Now
-              </button>
-            </div>
+          <!-- Action Buttons Group -->
+          <div class="nav-actions">
+            <!-- Check Prices Now (Instant Daily Scan) -->
+            <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()" title="Trigger instant price drop check">
+              <i class="fa-solid fa-bolt"></i>
+              <span>Check Prices</span>
+            </button>
+
+            <!-- Add / Import ASINs Button -->
+            <button id="btnOpenAddModal" class="btn btn-outline" onclick="openAddAsinModal()" title="Add single or batch ASINs">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add ASINs</span>
+            </button>
+
+            <!-- Live Scrape Active Group Button -->
+            <button id="btnRunScrape" class="btn btn-secondary" onclick="triggerActiveGroupScrape()" title="Crawl live Amazon prices for current tab">
+              <i class="fa-solid fa-rotate"></i>
+              <span id="scrapeBtnText">Scrape Tab</span>
+            </button>
+
+            <!-- Download Dedicated Group Excel Report -->
+            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 22-Month Excel Matrix">
+              <i class="fa-solid fa-file-excel"></i>
+              <span id="downloadBtnText">Export (.xlsx)</span>
+            </a>
           </div>
         </div>
-
-        <!-- Check Prices Now (Instant Daily Scan) -->
-        <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()">
-          <i class="fa-solid fa-bolt"></i>
-          <span>Check Prices Now</span>
-        </button>
-
-        <!-- Add / Import ASINs Button -->
-        <button id="btnOpenAddModal" class="btn btn-outline" onclick="openAddAsinModal()">
-          <i class="fa-solid fa-plus"></i>
-          <span>Add ASINs</span>
-        </button>
-
-        <!-- Live Scrape Active Group Button -->
-        <button id="btnRunScrape" class="btn btn-secondary" onclick="triggerActiveGroupScrape()">
-          <i class="fa-solid fa-rotate"></i>
-          <span id="scrapeBtnText">Scrape Tab</span>
-        </button>
-
-        <!-- Download Dedicated Group Excel Report -->
-        <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)">
-          <i class="fa-solid fa-file-excel"></i>
-          <span id="downloadBtnText">Download Excel (.xlsx)</span>
-        </a>
       </div>
     </header>
 
@@ -126,32 +152,18 @@
       </div>
     </section>
 
-    <!-- Navigation Tab Segmented Switcher & Controls -->
+    <!-- Sub-Navbar Bar (Breadcrumb / Status & Push Alerts) -->
     <section class="tab-navigation-wrapper">
-      <div class="tab-switcher">
-        <button class="tab-btn active" data-group="acer_monitors" onclick="switchDashboard('acer_monitors')">
-          <i class="fa-solid fa-display"></i>
-          <span>Acer Monitors & Stands</span>
-          <span class="tab-badge" id="badgeMonitorsCount">--</span>
-        </button>
-        <button class="tab-btn" data-group="other_products" onclick="switchDashboard('other_products')">
-          <i class="fa-solid fa-boxes-stacked"></i>
-          <span>Other Accessories</span>
-          <span class="tab-badge" id="badgeOtherCount">--</span>
-        </button>
-        <button class="tab-btn" data-group="all" onclick="switchDashboard('all')">
-          <i class="fa-solid fa-layer-group"></i>
-          <span>All Portfolio</span>
-          <span class="tab-badge" id="badgeAllCount">--</span>
-        </button>
-      </div>
-
-      <div class="tab-info-meta">
-        <button id="btnEnableBrowserNotif" class="btn btn-xs btn-outline" onclick="requestBrowserNotificationPermission()">
-          <i class="fa-solid fa-bell"></i>
-          <span id="notifPermText">Enable Push Alerts</span>
-        </button>
-        <span id="currentViewLabel">Viewing: <strong>Acer Monitors & Stands Dashboard</strong></span>
+      <div class="sub-nav-container">
+        <div class="tab-info-meta">
+          <span id="currentViewLabel">Viewing: <strong>Acer Monitors & Stands Dashboard</strong></span>
+        </div>
+        <div class="sub-nav-actions">
+          <button id="btnEnableBrowserNotif" class="btn btn-xs btn-outline" onclick="requestBrowserNotificationPermission()">
+            <i class="fa-solid fa-bell"></i>
+            <span id="notifPermText">Enable Push Alerts</span>
+          </button>
+        </div>
       </div>
     </section>
 

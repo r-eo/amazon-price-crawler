@@ -605,11 +605,13 @@ async function scrapeSingleAsin(asin) {
     const res = await fetch(`/api/scrape?asin=${asin}`, { method: "POST" });
     const data = await res.json();
     if (data.status === "completed") {
-      showToast(`ASIN ${asin} updated successfully.`, "success");
+      const prod = data.data;
+      const priceStr = prod && prod.current_price ? `₹${Number(prod.current_price).toLocaleString()}` : "live price";
+      showToast(`ASIN ${asin} updated: ${priceStr}`, "success");
       await loadDashboardData();
       await fetchPriceAlerts();
     } else {
-      showToast(`Scrape request submitted.`, "info");
+      showToast(data.message || `Scrape failed for ASIN ${asin}`, "amber");
     }
   } catch (err) {
     showToast(`Failed to crawl ASIN ${asin}`, "error");
@@ -819,8 +821,13 @@ async function checkSchedulerStatus() {
     const res = await fetch("/api/scheduler/status");
     const data = await res.json();
     const el = document.getElementById("schedulerStatusText");
+    const ind = document.getElementById("schedulerStatusIndicator");
     if (el && data.time_remaining) {
-      el.textContent = `Daily 10:00 AM Sync (in ${data.time_remaining})`;
+      const nextDisplay = data.next_time_display || "9:00 AM";
+      el.textContent = `Sync: ${nextDisplay} (in ${data.time_remaining})`;
+    }
+    if (ind && data.intervals) {
+      ind.title = `Automated sync runs daily every 4 hours: ${data.intervals.join(', ')}. Next sync at ${data.next_run_at || ''}`;
     }
   } catch (e) {
     // Silent fallback
