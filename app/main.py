@@ -276,11 +276,39 @@ def trigger_daily_price_check(
             "message": f"Live Amazon crawl complete for {grp_name}! Scanned {res.get('total', 0)} items ({res.get('price_drops_count', 0)} price drops detected)."
         }
     else:
-        background_tasks.add_task(scrape_all_asins, target_group)
+        # For larger groups: Crawl the first 12 visible items synchronously so table updates immediately!
+        all_prods = get_products_by_group(target_group)
+        first_batch = all_prods[:12]
+        rest_batch = all_prods[12:]
+        
+        from concurrent.futures import ThreadPoolExecutor
+        def _task(p):
+            return scrape_asin_details(p["asin"], group=p.get("product_group"), category=p.get("category"))
+        
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            results = list(ex.map(_task, first_batch))
+        
+        # Queue the remaining items in background
+        def _crawl_rest():
+            with ThreadPoolExecutor(max_workers=4) as ex:
+                list(ex.map(_task, rest_batch))
+            from app.excel_exporter import export_excel_by_group
+            export_excel_by_group(target_group)
+        
+        background_tasks.add_task(_crawl_rest)
+        
+        updated_products = get_products_by_group(target_group)
+        for p in updated_products:
+            p["stats"] = get_product_statistics(p["asin"])
+            
+        drops_count = sum(1 for r in results if r.get("price_dropped"))
         return {
-            "status": "queued",
+            "status": "completed",
             "group": target_group,
-            "message": f"Live crawl initiated for {grp_name}. Scanning catalog in background."
+            "total_scraped": len(first_batch),
+            "price_drops_count": drops_count,
+            "products": updated_products,
+            "message": f"Live Amazon scan updated visible items for {grp_name}! ({len(first_batch)} items scanned, background continuing for remaining)."
         }
 
 @app.post("/api/scrape")
