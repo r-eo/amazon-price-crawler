@@ -166,13 +166,13 @@ function updateChartMetric() {
           legend: {
             position: "top",
             align: "end",
-            labels: { color: "#CBD5E1", font: { family: "Inter", size: 11, weight: "600" } }
+            labels: { color: "#334155", font: { family: "Inter", size: 11, weight: "600" } }
           },
           tooltip: {
-            backgroundColor: "#151E33",
-            titleColor: "#F8FAFC",
-            bodyColor: "#CBD5E1",
-            borderColor: "#22304D",
+            backgroundColor: "#FFFFFF",
+            titleColor: "#0F172A",
+            bodyColor: "#334155",
+            borderColor: "#E2E8F0",
             borderWidth: 1,
             padding: 12,
             callbacks: {
@@ -181,11 +181,12 @@ function updateChartMetric() {
           }
         },
         scales: {
-          x: { grid: { color: "rgba(255, 255, 255, 0.05)" }, ticks: { color: "#94A3B8" } },
+          x: { grid: { color: "#F1F5F9" }, ticks: { color: "#64748B", font: { family: "Inter", size: 10 } } },
           y: {
-            grid: { color: "rgba(255, 255, 255, 0.05)" },
+            grid: { color: "#F1F5F9" },
             ticks: {
-              color: "#94A3B8",
+              color: "#64748B",
+              font: { family: "Inter", size: 10 },
               callback: (val) => currencySymbol + (val >= 1000 ? (val / 1000).toFixed(0) + "k" : val)
             }
           }

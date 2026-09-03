@@ -180,7 +180,7 @@ function checkPriceDropBanner(stats) {
 
   const topDrop = stats.top_price_drop;
   if (topDrop && topDrop.drop_pct > 0) {
-    bannerText.innerHTML = `<strong>${topDrop.title}</strong> dropped by <span style="color: #FBBF24; font-weight: 700;">${topDrop.drop_pct}%</span> (Saved ₹${Math.round(topDrop.drop_amount).toLocaleString()})! Live Price: <strong>${currencySymbol}${Math.round(topDrop.current_price).toLocaleString()}</strong>`;
+    bannerText.innerHTML = `<strong>${topDrop.title}</strong> dropped by <span style="color: #d97706; font-weight: 700;">${topDrop.drop_pct}%</span> (Saved ₹${Math.round(topDrop.drop_amount).toLocaleString()})! Live Price: <strong>${currencySymbol}${Math.round(topDrop.current_price).toLocaleString()}</strong>`;
     banner.style.display = "block";
   } else {
     banner.style.display = "none";
@@ -372,7 +372,7 @@ function renderProductsTable(products) {
       </td>
       <td class="text-right">
         <div style="display: flex; flex-direction: column; align-items: flex-end;">
-          <span class="price-val" style="color: #F8FAFC;">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
+          <span class="price-val" style="color: #0f172a; font-weight: 700; font-size: 14px;">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
           ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ATL DEAL</span>` : (hasPriceDrop ? `<span class="badge-drop"><i class="fa-solid fa-arrow-trend-down"></i> DROPPED</span>` : "")}
         </div>
       </td>
@@ -703,7 +703,7 @@ async function openProductDetailModal(asin) {
       <div class="modal-product-summary">
         <div class="modal-stat-box">
           <span class="modal-stat-label">Today's Price</span>
-          <span class="modal-stat-val" style="color: #F8FAFC;">${currencySymbol}${Math.round(p.current_price).toLocaleString()}</span>
+          <span class="modal-stat-val" style="color: var(--text-primary); font-weight: 700;">${currencySymbol}${Math.round(p.current_price).toLocaleString()}</span>
         </div>
         <div class="modal-stat-box">
           <span class="modal-stat-label">Baseline MRP</span>
@@ -715,7 +715,7 @@ async function openProductDetailModal(asin) {
         </div>
         <div class="modal-stat-box">
           <span class="modal-stat-label">22-Month Average</span>
-          <span class="modal-stat-val" style="color: #93C5FD;">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
+          <span class="modal-stat-val" style="color: var(--color-indigo); font-weight: 700;">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
         </div>
       </div>
 
