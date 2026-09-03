@@ -522,35 +522,40 @@ async function triggerDailyPriceCheck() {
     checkBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Checking Amazon...`;
   }
 
-  showToast("Scanning Amazon prices for price drops...", "amber");
+  showToast("Scanning Amazon live prices for price drops...", "amber");
 
   try {
     const res = await fetch(`/api/check-prices-daily?group=${currentGroup}`, { method: "POST" });
     const data = await res.json();
-    showToast(data.message || "Price scan initiated.", "success");
-
-    // Send Browser Push Notification if supported & permitted
-    if (Notification.permission === "granted") {
-      new Notification("Acer Amazon Price Check Initiated", {
-        body: `Daily price crawl running for ${currentGroup === 'acer_monitors' ? 'Monitors & Stands' : 'Accessories'}.`,
-        icon: "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg"
-      });
-    }
-
-    setTimeout(async () => {
+    
+    if (data.status === "completed") {
+      showToast(data.message || "Live price check completed!", "success");
       await loadDashboardData();
       await fetchPriceAlerts();
       await fetchTabCounts();
-    }, 3500);
+    } else {
+      showToast(data.message || "Price scan initiated in background.", "info");
+      setTimeout(async () => {
+        await loadDashboardData();
+        await fetchPriceAlerts();
+        await fetchTabCounts();
+      }, 5000);
+    }
+
+    // Send Browser Push Notification if supported & permitted
+    if (Notification.permission === "granted") {
+      new Notification("Acer Amazon Price Check Complete", {
+        body: `Live price crawl completed for ${currentGroup === 'acer_monitors' ? 'Monitors & Stands' : 'Accessories'}.`,
+        icon: "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg"
+      });
+    }
   } catch (err) {
     showToast("Error triggering daily scan.", "error");
   } finally {
-    setTimeout(() => {
-      if (checkBtn) {
-        checkBtn.disabled = false;
-        checkBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> <span>Check Prices Now</span>`;
-      }
-    }, 2000);
+    if (checkBtn) {
+      checkBtn.disabled = false;
+      checkBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> <span>Check Prices</span>`;
+    }
   }
 }
 
@@ -844,7 +849,7 @@ async function checkSchedulerStatus() {
       el.textContent = `Sync: ${nextDisplay} (in ${data.time_remaining})`;
     }
     if (ind && data.intervals) {
-      ind.title = `Automated sync runs daily every 4 hours: ${data.intervals.join(', ')}. Next sync at ${data.next_run_at || ''}`;
+      ind.title = `Automated sync runs daily every hour starting at 9:00 AM. Next: ${data.next_run_at || ''}`;
     }
   } catch (e) {
     // Silent fallback

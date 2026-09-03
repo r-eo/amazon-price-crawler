@@ -24,14 +24,14 @@ ACER_MONITOR_SEED_PRODUCTS = [
     },
     {
         "asin": "B0DCW28VCS",
-        "title": "Acer Ergo Monitor Stand with RGB Lights and 4 Port USB HUB (White) (ZC.A01SI.17A)",
+        "title": "acer Ergo Multifunction Monitor & Laptop Stand Featuring RGB Lighting and a 4-Port USB Hub with Aluminum Multi Keyboard Storage Space Bar, Suitable for Both Office and Home Environments (White)",
         "category": "Monitor Stands & Mounts",
         "product_group": "acer_monitors",
         "part_no": "ZC.A01SI.17A",
-        "mrp": 4999.0,
-        "base_price": 2999.0,
+        "mrp": 8999.0,
+        "base_price": 1799.0,
         "rating": 4.3,
-        "review_count": 85,
+        "review_count": 192,
         "image_url": "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg",
         "url_slug": "acer-ergo-monitor-stand-with-rgb-lights-and-4-port",
         "amazon_link": "https://amzn.in/d/08wi0EN8"

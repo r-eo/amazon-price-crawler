@@ -56,34 +56,67 @@ def parse_price(price_str: Optional[str]) -> Optional[float]:
     except ValueError:
         return None
 
-def fetch_page_content(url: str) -> Optional[str]:
+def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
     """
-    Fetches HTML content using curl_cffi with Chrome TLS impersonation
-    and falls back to standard requests if needed.
+    Fetches HTML content using curl_cffi with Chrome TLS impersonation,
+    Indian locale cookies, and automatic mobile fallback (/gp/aw/d/{asin}) if CAPTCHA is met.
     """
+    cookies = {
+        "i18n-prefs": "INR",
+        "lc-acbin": "en_IN",
+    }
+
+    # 1. Primary Attempt: Standard /dp/ URL with Chrome impersonation
     try:
         from curl_cffi import requests as curl_requests
         response = curl_requests.get(
             url,
             headers=DEFAULT_HEADERS,
+            cookies=cookies,
             impersonate="chrome124",
             timeout=15,
             allow_redirects=True
         )
-        if response.status_code == 200:
+        if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
             return response.text
-        logger.warning(f"curl_cffi received status {response.status_code} for {url}")
+        logger.warning(f"curl_cffi primary attempt for {url} returned status {response.status_code} or CAPTCHA.")
     except Exception as e:
-        logger.warning(f"curl_cffi fetch failed ({e}), falling back to requests...")
+        logger.warning(f"curl_cffi primary fetch failed ({e}), trying fallback...")
 
+    # 2. Secondary Attempt: Mobile Web (/gp/aw/d/{asin}) which bypasses bot detection
+    if asin:
+        mobile_url = f"https://www.amazon.in/gp/aw/d/{asin}"
+        mobile_headers = {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-IN,en;q=0.9",
+        }
+        try:
+            from curl_cffi import requests as curl_requests
+            response = curl_requests.get(
+                mobile_url,
+                headers=mobile_headers,
+                cookies=cookies,
+                impersonate="safari15_5",
+                timeout=15,
+                allow_redirects=True
+            )
+            if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
+                logger.info(f"Mobile web fallback succeeded for ASIN {asin}.")
+                return response.text
+        except Exception as e:
+            logger.warning(f"Mobile fallback failed ({e}) for ASIN {asin}.")
+
+    # 3. Tertiary Attempt: Standard Python requests with session
     try:
         import requests
-        response = requests.get(url, headers=DEFAULT_HEADERS, timeout=15)
-        if response.status_code == 200:
+        session = requests.Session()
+        session.headers.update(DEFAULT_HEADERS)
+        response = session.get(url, cookies=cookies, timeout=15)
+        if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
             return response.text
-        logger.warning(f"requests received status {response.status_code} for {url}")
     except Exception as e:
-        logger.error(f"Failed to fetch {url}: {e}")
+        logger.error(f"All fetch attempts failed for {url}: {e}")
 
     return None
 
@@ -101,7 +134,7 @@ def scrape_asin_details(
     url = f"{BASE_AMAZON_URL}/dp/{asin}"
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    html = fetch_page_content(url)
+    html = fetch_page_content(url, asin=asin)
     
     # Existing product in DB or fallback
     existing = get_product_by_asin(asin) or get_seed_fallback(asin)
@@ -262,24 +295,15 @@ def scrape_asin_details(
         if not mrp or mrp < (existing_mrp * 0.25):
             mrp = existing_mrp
 
-    # 5. Price Sanity Validation
+    # 5. Price Sanity Validation (permit steep Amazon limited-time discounts)
     baseline_mrp = mrp or existing_mrp
     if price and baseline_mrp and baseline_mrp > 0:
-        if price > (baseline_mrp * 1.15):
-            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (>1.15x). Retaining previous price.")
+        if price > (baseline_mrp * 1.5):
+            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (>1.5x). Retaining previous price.")
             price = existing.get("current_price") if existing else baseline_mrp
-        elif price < (baseline_mrp * 0.10):
-            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (<0.10x). Retaining previous price.")
+        elif price < 40:
+            logger.warning(f"ASIN {asin}: Scraped price {price} < 40 INR. Retaining previous price.")
             price = existing.get("current_price") if existing else baseline_mrp
-
-    # Secondary sanity check against previous verified price
-    if price and prev_price and prev_price > 0:
-        if price > (prev_price * 2.2):
-            logger.warning(f"ASIN {asin}: Scraped price {price} surged >220% over previous {prev_price}. Retaining previous price.")
-            price = prev_price
-        elif price < (prev_price * 0.20):
-            logger.warning(f"ASIN {asin}: Scraped price {price} plummeted >80% below previous {prev_price}. Retaining previous price.")
-            price = prev_price
 
     # 6. Rating and Reviews
     rating = existing.get("rating", 4.2) if existing else 4.2
@@ -395,16 +419,21 @@ def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
     any_price_changed = False
     price_drops_found = []
 
-    for p in products:
-        asin = p["asin"]
-        logger.info(f"Crawling ASIN: {asin} (Group: {p.get('product_group')})...")
-        res = scrape_asin_details(asin, group=p.get("product_group"), category=p.get("category"))
-        results.append(res)
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _scrape_one(p):
+        a = p["asin"]
+        logger.info(f"Crawling ASIN: {a} (Group: {p.get('product_group')})...")
+        return scrape_asin_details(a, group=p.get("product_group"), category=p.get("category"))
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        results = list(executor.map(_scrape_one, products))
+
+    for res in results:
         if res.get("price_changed"):
             any_price_changed = True
         if res.get("price_dropped") and res.get("drop_info"):
             price_drops_found.append(res.get("drop_info"))
-        time.sleep(0.5)
 
     # Dynamic Trigger: Ensure fresh Excel export
     try:

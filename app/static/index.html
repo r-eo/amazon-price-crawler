@@ -18,7 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <!-- Modern Slate & Cyber Gradient CSS -->
-  <link rel="stylesheet" href="/css/style.css?v=4.0.1">
+  <link rel="stylesheet" href="/css/style.css?v=4.0.2">
 </head>
 <body>
   <div class="app-layout">
@@ -35,7 +35,7 @@
               <h1>ACER <span>INTELLIGENCE</span></h1>
               <span class="env-badge">ENTERPRISE v3.0</span>
             </div>
-            <p class="brand-desc">Amazon Dual Dashboard &bull; 3-Interval Daily Sync (9 AM, 1 PM, 5 PM) &bull; 22-Month History</p>
+            <p class="brand-desc">Amazon Dual Dashboard &bull; Hourly Sync (Starting 9 AM) &bull; 22-Month History</p>
           </div>
         </div>
 
@@ -61,10 +61,10 @@
         </div>
 
         <div class="nav-right">
-          <!-- Live 3-Interval Scheduler Status -->
-          <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every 4 hours: 9:00 AM, 1:00 PM, and 5:00 PM">
+          <!-- Live Hourly Scheduler Status -->
+          <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every hour starting at 9:00 AM">
             <span class="status-dot"></span>
-            <span id="schedulerStatusText">Sync: 9 AM, 1 PM, 5 PM</span>
+            <span id="schedulerStatusText">Hourly Sync (from 9 AM)</span>
           </div>
 
           <!-- Notification Bell with Unread Badge & Dropdown -->
@@ -381,7 +381,7 @@
   </div>
 
   <!-- Javascript Modules -->
-  <script src="/js/charts.js?v=4.0.1"></script>
-  <script src="/js/app.js?v=4.0.1"></script>
+  <script src="/js/charts.js?v=4.0.2"></script>
+  <script src="/js/app.js?v=4.0.2"></script>
 </body>
 </html>

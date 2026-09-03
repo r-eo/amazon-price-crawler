@@ -110,10 +110,10 @@ def check_and_auto_sync_if_stale(force: bool = False):
 
 async def scheduled_sync_loop():
     """
-    Background worker that runs automatically every 4 hours daily across 3 intervals:
-    9:00 AM, 1:00 PM, and 5:00 PM. Crawls products and pre-generates daily 22-Month Excel reports.
+    Background worker that runs automatically every hour daily starting at 9:00 AM.
+    Crawls products and pre-generates daily 22-Month Excel reports.
     """
-    logger.info(f"Daily automated scheduler active: 3 intervals at {', '.join(f'{h:02d}:00' for h in SYNC_INTERVAL_HOURS)}.")
+    logger.info(f"Daily automated scheduler active: hourly intervals starting at 9 AM: {', '.join(f'{h:02d}:00' for h in SYNC_INTERVAL_HOURS)}.")
     while True:
         try:
             now = datetime.now()
@@ -197,7 +197,7 @@ def health_check():
 
 @app.get("/api/scheduler/status")
 def scheduler_status():
-    """Returns status and next execution time of the 3-interval daily sync schedule (9 AM, 1 PM, 5 PM)."""
+    """Returns status and next execution time of the hourly daily sync schedule starting at 9 AM."""
     now = datetime.now()
     target_time = get_next_sync_target(now)
     diff = target_time - now
@@ -205,10 +205,11 @@ def scheduler_status():
     minutes, _ = divmod(remainder, 60)
     
     formatted_time = target_time.strftime("%I:%M %p").lstrip("0")
+    intervals_display = [datetime.strptime(str(h), "%H").strftime("%I:%M %p").lstrip("0") for h in sorted(SYNC_INTERVAL_HOURS)]
     
     return {
-        "schedule_type": "3 Daily Intervals",
-        "intervals": ["9:00 AM", "1:00 PM", "5:00 PM"],
+        "schedule_type": "Hourly Intervals (from 9 AM)",
+        "intervals": intervals_display,
         "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S"),
         "next_time_display": formatted_time,
         "time_remaining": f"{hours}h {minutes}m",
@@ -253,14 +254,27 @@ def trigger_daily_price_check(
 ):
     """
     Triggers an instant scan across products to check prices, detect drops,
-    and issue alerts immediately.
+    and issue alerts immediately. Scans current tab synchronously when possible.
     """
-    background_tasks.add_task(scrape_all_asins, group)
-    grp_name = "Acer Monitors & Stands" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
-    return {
-        "status": "queued",
-        "message": f"Price scan initiated for {grp_name}. Notifications will trigger for any detected price drops."
-    }
+    target_group = group or GROUP_ACER_MONITORS
+    grp_name = "Acer Monitors & Stands" if target_group == GROUP_ACER_MONITORS else ("Other Products" if target_group == GROUP_OTHER_PRODUCTS else "All Products")
+    
+    if target_group == GROUP_ACER_MONITORS:
+        res = scrape_all_asins(target_group)
+        return {
+            "status": "completed",
+            "group": target_group,
+            "total_scraped": res.get("total", 0),
+            "price_drops_count": res.get("price_drops_count", 0),
+            "message": f"Live Amazon crawl complete for {grp_name}! Scanned {res.get('total', 0)} items ({res.get('price_drops_count', 0)} price drops detected)."
+        }
+    else:
+        background_tasks.add_task(scrape_all_asins, target_group)
+        return {
+            "status": "queued",
+            "group": target_group,
+            "message": f"Live crawl initiated for {grp_name}. Scanning catalog in background."
+        }
 
 @app.post("/api/scrape")
 def api_scrape_endpoint(
