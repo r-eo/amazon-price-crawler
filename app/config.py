@@ -50,7 +50,7 @@ DEFAULT_HEADERS = {
 }
 
 # Number of historical months to generate/track
-HISTORY_MONTHS_COUNT = 22
+HISTORY_MONTHS_COUNT = 6
 CURRENCY_SYMBOL = "₹" if DEFAULT_REGION == "in" else "$"
 CURRENCY_CODE = "INR" if DEFAULT_REGION == "in" else "USD"
 

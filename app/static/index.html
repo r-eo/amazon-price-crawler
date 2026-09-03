@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Acer Amazon Price Intelligence & Drop Tracker</title>
-  <meta name="description" content="Dedicated enterprise price intelligence platform for Acer Monitors, Hardware & Amazon Accessories. Real-time daily price checking, price drop notifications, 22-month historical matrices, and automated Excel exports.">
+  <meta name="description" content="Dedicated enterprise price intelligence platform for Acer Monitors, Hardware & Amazon Accessories. Real-time daily price checking, price drop notifications, 6-month historical matrices, and automated Excel exports.">
   
   <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <!-- Modern Slate & Cyber Gradient CSS -->
-  <link rel="stylesheet" href="/css/style.css?v=4.0.2">
+  <link rel="stylesheet" href="/css/style.css?v=4.0.3">
 </head>
 <body>
   <div class="app-layout">
@@ -35,7 +35,7 @@
               <h1>ACER <span>INTELLIGENCE</span></h1>
               <span class="env-badge">ENTERPRISE v3.0</span>
             </div>
-            <p class="brand-desc">Amazon Dual Dashboard &bull; Hourly Sync (Starting 9 AM) &bull; 22-Month History</p>
+            <p class="brand-desc">Amazon Dual Dashboard &bull; Hourly Sync (Starting 9 AM) &bull; 6-Month History</p>
           </div>
         </div>
 
@@ -125,7 +125,7 @@
             </button>
 
             <!-- Download Dedicated Group Excel Report -->
-            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 22-Month Excel Matrix">
+            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix">
               <i class="fa-solid fa-file-excel"></i>
               <span id="downloadBtnText">Export (.xlsx)</span>
             </a>
@@ -224,7 +224,7 @@
             <span class="kpi-val text-cyan" id="kpiAtlDeals">--</span>
           </div>
           <div class="kpi-footer">
-            <span class="kpi-subtext">Within 1% of 22-Month Low</span>
+            <span class="kpi-subtext">Within 1% of 6-Month Low</span>
           </div>
         </div>
       </section>
@@ -234,7 +234,7 @@
         <div class="chart-card">
           <div class="chart-card-header">
             <div class="chart-title-box">
-              <h2 id="chartTitle">22-Month Price Trajectory & Seasonal Cycles</h2>
+              <h2 id="chartTitle">6-Month Price Trajectory & Seasonal Cycles</h2>
               <p class="chart-subtitle">Monthly pricing benchmarks across categories from Excel portfolio</p>
             </div>
             <div class="chart-actions">
@@ -294,7 +294,7 @@
                   <th style="width: 120px;" class="text-right">Today's Price</th>
                   <th style="width: 100px;" class="text-right">MRP</th>
                   <th style="width: 100px;" class="text-center">Discount</th>
-                  <th style="width: 110px;" class="text-center">22-Mo Low</th>
+                  <th style="width: 110px;" class="text-center">6-Mo Low</th>
                   <th style="width: 100px;" class="text-center">Stock</th>
                   <th style="width: 130px;" class="text-center">Actions</th>
                 </tr>
@@ -381,7 +381,7 @@
   </div>
 
   <!-- Javascript Modules -->
-  <script src="/js/charts.js?v=4.0.2"></script>
-  <script src="/js/app.js?v=4.0.2"></script>
+  <script src="/js/charts.js?v=4.0.3"></script>
+  <script src="/js/app.js?v=4.0.3"></script>
 </body>
 </html>

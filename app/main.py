@@ -169,8 +169,11 @@ app.add_middleware(
 @app.middleware("http")
 async def add_no_cache_headers(request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/js") or request.url.path.startswith("/css") or request.url.path == "/":
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    if (request.url.path.startswith("/api") or
+        request.url.path.startswith("/js") or
+        request.url.path.startswith("/css") or
+        request.url.path == "/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
@@ -261,11 +264,15 @@ def trigger_daily_price_check(
     
     if target_group == GROUP_ACER_MONITORS:
         res = scrape_all_asins(target_group)
+        products = get_products_by_group(target_group)
+        for p in products:
+            p["stats"] = get_product_statistics(p["asin"])
         return {
             "status": "completed",
             "group": target_group,
             "total_scraped": res.get("total", 0),
             "price_drops_count": res.get("price_drops_count", 0),
+            "products": products,
             "message": f"Live Amazon crawl complete for {grp_name}! Scanned {res.get('total', 0)} items ({res.get('price_drops_count', 0)} price drops detected)."
         }
     else:
@@ -290,11 +297,12 @@ def api_scrape_endpoint(
         res = scrape_asin_details(asin=clean_asin)
         prod = get_product_by_asin(clean_asin)
         if prod:
+            prod["stats"] = get_product_statistics(clean_asin)
             background_tasks.add_task(export_excel_by_group, prod.get("product_group", GROUP_ACER_MONITORS))
         return {
             "status": "completed" if res.get("success") else "failed",
             "asin": clean_asin,
-            "data": res.get("data"),
+            "data": prod or res.get("data"),
             "message": res.get("message")
         }
     

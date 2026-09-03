@@ -23,54 +23,49 @@ SALE_EVENTS = {
 
 def generate_22_month_history(base_price: float, mrp: float, end_date: datetime = None) -> List[Dict[str, Any]]:
     """
-    Generates realistic 22-month historical price data points for an ASIN.
-    Accounts for seasonal sales, general tech depreciation, and minor weekly volatility.
+    Generates realistic historical price data points for an ASIN over HISTORY_MONTHS_COUNT months (6 months).
+    Accounts for seasonal sales, tech depreciation, and preserves current base price.
     """
     if end_date is None:
         end_date = datetime.now()
 
-    # Generate 22 monthly checkpoints backwards
     records = []
-    # Seed reproducible random based on base_price so values are consistent per ASIN
     rng = random.Random(int(base_price) if base_price > 0 else 42)
-
-    # Tech products generally launch higher and slowly trend downward or stabilize
-    initial_launch_multiplier = 1.08  # 22 months ago it was slightly higher than base
+    initial_launch_multiplier = 1.05
 
     for i in range(HISTORY_MONTHS_COUNT - 1, -1, -1):
-        # Calculate target month date (~30.4 days per month)
         point_date = end_date - timedelta(days=int(i * 30.4375))
-        month_str = point_date.strftime("%b %Y")  # e.g., "Nov 2024"
+        month_str = point_date.strftime("%b %Y")
         timestamp = point_date.strftime("%Y-%m-%d")
         month_num = point_date.month
 
-        # Age depreciation factor: decreases slightly over 22 months
-        age_factor = 1.0 + (i / 22.0) * (initial_launch_multiplier - 1.0)
-        baseline_for_month = base_price * age_factor
+        if i == 0:
+            # Current month is ALWAYS the actual live base_price!
+            clean_price = float(base_price)
+            is_sale = 0
+            sale_tag = "Current"
+        else:
+            age_factor = 1.0 + (i / float(HISTORY_MONTHS_COUNT)) * (initial_launch_multiplier - 1.0)
+            baseline_for_month = base_price * age_factor
 
-        # Check for seasonal sales
-        is_sale = 0
-        sale_tag = None
-        discount_factor = 1.0
+            is_sale = 0
+            sale_tag = None
+            discount_factor = 1.0
 
-        if month_num in SALE_EVENTS:
-            event_name, extra_disc = SALE_EVENTS[month_num]
-            if rng.random() < 0.85:
-                is_sale = 1
-                sale_tag = event_name
-                discount_factor -= extra_disc
+            if month_num in SALE_EVENTS:
+                event_name, extra_disc = SALE_EVENTS[month_num]
+                if rng.random() < 0.85:
+                    is_sale = 1
+                    sale_tag = event_name
+                    discount_factor -= extra_disc
 
-        # Add small natural market jitter (+/- 2.5%)
-        jitter = rng.uniform(-0.025, 0.025)
-        calculated_price = baseline_for_month * discount_factor * (1.0 + jitter)
+            jitter = rng.uniform(-0.02, 0.02)
+            calculated_price = baseline_for_month * discount_factor * (1.0 + jitter)
+            if mrp > 0:
+                calculated_price = min(mrp * 0.98, max(base_price * 0.80, calculated_price))
 
-        # Ensure price never exceeds MRP and doesn't drop below 45% of MRP
-        if mrp > 0:
-            calculated_price = min(mrp * 0.98, max(mrp * 0.45, calculated_price))
-        
-        # Round to neat 90s or 99s typical of Amazon pricing
-        clean_price = round(calculated_price / 10) * 10 - (1 if rng.random() > 0.5 else 10)
-        clean_price = round(max(float(clean_price), 299.0), 2)
+            clean_price = round(calculated_price / 10) * 10 - (1 if rng.random() > 0.5 else 10)
+            clean_price = round(max(float(clean_price), 299.0), 2)
 
         records.append({
             "timestamp": timestamp,
@@ -82,6 +77,8 @@ def generate_22_month_history(base_price: float, mrp: float, end_date: datetime 
         })
 
     return records
+
+generate_6_month_history = generate_22_month_history
 
 def seed_custom_asin_timeline(asin: str, base_price: float, mrp: float, product_data: Dict[str, Any]):
     """Inserts a new custom ASIN product and seeds its 22-month timeline."""
@@ -108,13 +105,22 @@ def seed_custom_asin_timeline(asin: str, base_price: float, mrp: float, product_
         add_price_history_batch(db_history_records)
 
 def seed_database_if_empty(force: bool = False):
-    """Initializes and seeds database with verified products & 22-month timelines."""
+    """Initializes and seeds database with verified products & 6-month timelines."""
+    from app.database import get_db_connection
     init_db()
     existing_products = get_all_products()
     existing_asins = {p["asin"] for p in existing_products}
     seed_asins = {p["asin"] for p in ACER_SEED_PRODUCTS}
     
-    # If forced or if existing products do not match current seed ASINs, reseed
+    # If forced or if existing history has 22-month count while now 6-month, reseed
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(id) FROM price_history")
+        row = cursor.fetchone()
+        cnt = row[0] if row else 0
+        if cnt > len(ACER_SEED_PRODUCTS) * (HISTORY_MONTHS_COUNT + 1):
+            force = True
+
     if force or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
     elif existing_products and len(existing_products) >= len(ACER_SEED_PRODUCTS):
@@ -128,11 +134,11 @@ def seed_database_if_empty(force: bool = False):
         asin = item["asin"]
         url = item.get("amazon_link") or f"{BASE_AMAZON_URL}/dp/{asin}"
         
-        # Generate 22 months of history
+        # Generate 6 months of history
         history_points = generate_22_month_history(item["base_price"], item["mrp"], end_date=now)
         
-        # Today's price is the latest generated price point
-        todays_price = history_points[-1]["price"]
+        # Today's price is the exact verified catalog price
+        todays_price = float(item["base_price"])
         prev_month_price = history_points[-2]["price"] if len(history_points) >= 2 else todays_price
 
         grp = item.get("product_group")

@@ -25,8 +25,8 @@ def build_excel_workbook(
     """
     Generates a structured, executive-styled monotone Excel workbook containing:
     1. Product_Overview: Specs, live prices, discounts, ATL/ATH metrics, clickable Amazon links.
-    2. 22_Months_Price_History: Full monthly matrix across all 22 months with direct links and deal markers.
-    3. Monthly_Statistics: Category-level and portfolio aggregate metrics over 22 months.
+    2. 6_Months_Price_History: Full monthly matrix across all 6 months with direct links and deal markers.
+    3. Monthly_Statistics: Category-level and portfolio aggregate metrics over 6 months.
     """
     wb = openpyxl.Workbook()
     
@@ -184,15 +184,15 @@ def build_excel_workbook(
                 cell.font = link_font
 
     # =========================================================================
-    # SHEET 2: 22_Months_Price_History
+    # SHEET 2: 6_Months_Price_History
     # =========================================================================
-    ws2 = wb.create_sheet(title="22_Months_Price_History")
+    ws2 = wb.create_sheet(title="6_Months_Price_History")
     ws2.views.sheetView[0].showGridLines = True
 
     total_h_cols = 4 + len(month_labels) + 2
     ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_h_cols)
     title_cell2 = ws2["A1"]
-    title_cell2.value = f"{report_title} — 22-MONTH HISTORICAL PRICE MATRIX"
+    title_cell2.value = f"{report_title} — 6-MONTH HISTORICAL PRICE MATRIX"
     title_cell2.font = title_font
     title_cell2.fill = title_fill
     title_cell2.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -200,7 +200,7 @@ def build_excel_workbook(
 
     ws2.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_h_cols)
     sub_cell2 = ws2["A2"]
-    sub_cell2.value = f"Complete monthly trajectory from {month_labels[0]} to {month_labels[-1]} | Includes seasonal sales (Prime Day, Diwali, Republic Day, Black Friday)"
+    sub_cell2.value = f"Complete monthly trajectory from {month_labels[0]} to {month_labels[-1]} | Includes seasonal sales"
     sub_cell2.font = subtitle_font
     sub_cell2.fill = title_fill
     sub_cell2.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -209,7 +209,7 @@ def build_excel_workbook(
     ws2.append([]) # Row 3 spacer
     ws2.row_dimensions[3].height = 8
 
-    headers2 = ["ASIN", "Product Title", "Category", "Baseline MRP"] + month_labels + ["22-Mo Min", "22-Mo Max"]
+    headers2 = ["ASIN", "Product Title", "Category", "Baseline MRP"] + month_labels + ["6-Mo Min", "6-Mo Max"]
     ws2.append(headers2)
     ws2.row_dimensions[4].height = 26
 
@@ -282,7 +282,7 @@ def build_excel_workbook(
 
     ws3.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_s_cols)
     sub_cell3 = ws3["A2"]
-    sub_cell3.value = f"Average Category Price Trends across 22-Month Observation Period ({CURRENCY_SYMBOL} INR)"
+    sub_cell3.value = f"Average Category Price Trends across 6-Month Observation Period ({CURRENCY_SYMBOL} INR)"
     sub_cell3.font = subtitle_font
     sub_cell3.fill = title_fill
     sub_cell3.alignment = Alignment(horizontal="left", vertical="center", indent=1)

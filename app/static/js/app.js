@@ -41,10 +41,11 @@ async function initApp() {
  */
 async function fetchTabCounts() {
   try {
+    const t = Date.now();
     const [resMonitors, resOther, resAll] = await Promise.all([
-      fetch("/api/products?group=acer_monitors"),
-      fetch("/api/products?group=other_products"),
-      fetch("/api/products?group=all")
+      fetch(`/api/products?group=acer_monitors&_t=${t}`, { cache: "no-store" }),
+      fetch(`/api/products?group=other_products&_t=${t}`, { cache: "no-store" }),
+      fetch(`/api/products?group=all&_t=${t}`, { cache: "no-store" })
     ]);
 
     const dataMonitors = await resMonitors.json();
@@ -91,21 +92,21 @@ async function switchDashboard(group) {
     scrapeText.textContent = "Scrape Monitors Tab";
     viewLabel.innerHTML = "Viewing: <strong>Acer Monitors & Stands Dashboard</strong>";
     kpiScopeLabel.textContent = "Tracked Hardware";
-    chartTitle.textContent = "Acer Monitors & Stands — 22-Month Price Trajectory";
+    chartTitle.textContent = "Acer Monitors & Stands — 6-Month Price Trajectory";
   } else if (group === "other_products") {
     downloadBtn.href = "/api/export/excel?group=other_products";
     downloadText.textContent = "Download Accessories Excel (.xlsx)";
     scrapeText.textContent = "Scrape Accessories Tab";
     viewLabel.innerHTML = "Viewing: <strong>Other Accessories Dashboard</strong>";
     kpiScopeLabel.textContent = "Tracked Accessories";
-    chartTitle.textContent = "Other Accessories — 22-Month Price Trajectory";
+    chartTitle.textContent = "Other Accessories — 6-Month Price Trajectory";
   } else {
     downloadBtn.href = "/api/export/excel?group=all";
     downloadText.textContent = "Download All Portfolio (.xlsx)";
     scrapeText.textContent = "Scrape All Portfolio";
     viewLabel.innerHTML = "Viewing: <strong>Full 90-Product Portfolio</strong>";
     kpiScopeLabel.textContent = "Total Products";
-    chartTitle.textContent = "Overall Portfolio — 22-Month Price Trajectory";
+    chartTitle.textContent = "Overall Portfolio — 6-Month Price Trajectory";
   }
 
   // Pre-select group in modal
@@ -123,9 +124,10 @@ async function switchDashboard(group) {
  */
 async function loadDashboardData() {
   try {
+    const timestamp = Date.now();
     const [prodRes, statsRes] = await Promise.all([
-      fetch(`/api/products?group=${currentGroup}`),
-      fetch(`/api/stats?group=${currentGroup}`)
+      fetch(`/api/products?group=${currentGroup}&_t=${timestamp}`, { cache: "no-store" }),
+      fetch(`/api/stats?group=${currentGroup}&_t=${timestamp}`, { cache: "no-store" })
     ]);
 
     const prodData = await prodRes.json();
@@ -394,7 +396,7 @@ function renderProductsTable(products) {
       </td>
       <td class="text-center">
         <div class="action-buttons">
-          <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 22-Month Price Timeline">
+          <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 6-Month Price Timeline">
             <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
           </button>
           <button class="btn btn-icon btn-outline" onclick="scrapeSingleAsin('${p.asin}')" title="Live Crawl Amazon Price">
@@ -435,7 +437,7 @@ function closeNotificationPanel() {
 
 async function fetchPriceAlerts() {
   try {
-    const res = await fetch("/api/alerts?limit=30");
+    const res = await fetch(`/api/alerts?limit=30&_t=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
     const alerts = data.alerts || [];
     const unreadCount = data.unread_count || 0;
@@ -525,11 +527,18 @@ async function triggerDailyPriceCheck() {
   showToast("Scanning Amazon live prices for price drops...", "amber");
 
   try {
-    const res = await fetch(`/api/check-prices-daily?group=${currentGroup}`, { method: "POST" });
+    const res = await fetch(`/api/check-prices-daily?group=${currentGroup}&_t=${Date.now()}`, { 
+      method: "POST",
+      cache: "no-store"
+    });
     const data = await res.json();
     
     if (data.status === "completed") {
       showToast(data.message || "Live price check completed!", "success");
+      if (data.products && data.products.length > 0) {
+        allProducts = data.products;
+        applyFiltersAndRenderTable();
+      }
       await loadDashboardData();
       await fetchPriceAlerts();
       await fetchTabCounts();
@@ -539,7 +548,7 @@ async function triggerDailyPriceCheck() {
         await loadDashboardData();
         await fetchPriceAlerts();
         await fetchTabCounts();
-      }, 5000);
+      }, 4000);
     }
 
     // Send Browser Push Notification if supported & permitted
@@ -607,12 +616,24 @@ function updateBrowserNotificationButton() {
 async function scrapeSingleAsin(asin) {
   showToast(`Scraping Amazon live price for ${asin}...`, "info");
   try {
-    const res = await fetch(`/api/scrape?asin=${asin}`, { method: "POST" });
+    const res = await fetch(`/api/scrape?asin=${asin}&_t=${Date.now()}`, { 
+      method: "POST",
+      cache: "no-store"
+    });
     const data = await res.json();
     if (data.status === "completed") {
       const prod = data.data;
       const priceStr = prod && prod.current_price ? `₹${Number(prod.current_price).toLocaleString()}` : "live price";
       showToast(`ASIN ${asin} updated: ${priceStr}`, "success");
+      
+      // Instantly update DOM row
+      if (prod) {
+        const idx = allProducts.findIndex(p => p.asin === asin);
+        if (idx !== -1) {
+          allProducts[idx] = { ...allProducts[idx], ...prod };
+          applyFiltersAndRenderTable();
+        }
+      }
       await loadDashboardData();
       await fetchPriceAlerts();
     } else {
@@ -627,28 +648,7 @@ async function scrapeSingleAsin(asin) {
  * Scrape Active Group
  */
 async function triggerActiveGroupScrape() {
-  const scrapeBtn = document.getElementById("btnRunScrape");
-  scrapeBtn.disabled = true;
-  scrapeBtn.classList.add("loading");
-
-  showToast(`Initiating live crawl for ${currentGroup}...`, "info");
-
-  try {
-    const res = await fetch(`/api/scrape?group=${currentGroup}`, { method: "POST" });
-    const data = await res.json();
-    showToast(data.message || "Crawl job queued.", "success");
-    setTimeout(async () => {
-      await loadDashboardData();
-      await fetchPriceAlerts();
-    }, 3500);
-  } catch (err) {
-    showToast("Error starting live crawl.", "error");
-  } finally {
-    setTimeout(() => {
-      scrapeBtn.disabled = false;
-      scrapeBtn.classList.remove("loading");
-    }, 2000);
-  }
+  await triggerDailyPriceCheck();
 }
 
 /**
@@ -673,7 +673,7 @@ async function confirmDeleteAsin(asin) {
  * Download Group Excel
  */
 function downloadGroupExcel(e) {
-  showToast(`Preparing ${currentGroup} 22-Month Excel report...`, "info");
+  showToast(`Preparing ${currentGroup} 6-Month Excel report...`, "info");
 }
 
 /**
@@ -689,12 +689,12 @@ async function openProductDetailModal(asin) {
   modalBody.innerHTML = `
     <div style="text-align: center; padding: 40px; color: var(--text-muted);">
       <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: var(--color-indigo);"></i>
-      <p style="margin-top: 10px;">Loading historical 22-month timeline...</p>
+      <p style="margin-top: 10px;">Loading historical 6-month timeline...</p>
     </div>
   `;
 
   try {
-    const res = await fetch(`/api/products/${asin}`);
+    const res = await fetch(`/api/products/${asin}?_t=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
 
     const p = data.product;
@@ -715,18 +715,18 @@ async function openProductDetailModal(asin) {
           <span class="modal-stat-val">${currencySymbol}${Math.round(p.mrp).toLocaleString()}</span>
         </div>
         <div class="modal-stat-box">
-          <span class="modal-stat-label">22-Month Lowest</span>
+          <span class="modal-stat-label">6-Month Lowest</span>
           <span class="modal-stat-val" style="color: var(--color-emerald);">${currencySymbol}${Math.round(stats.min_price || p.current_price).toLocaleString()}</span>
         </div>
         <div class="modal-stat-box">
-          <span class="modal-stat-label">22-Month Average</span>
+          <span class="modal-stat-label">6-Month Average</span>
           <span class="modal-stat-val" style="color: var(--color-indigo); font-weight: 700;">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
         </div>
       </div>
 
       <div style="background-color: var(--bg-input); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-          <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">22-Month Trajectory & Seasonal Deals</span>
+          <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">6-Month Trajectory & Seasonal Deals</span>
           <span style="font-size: 11px; color: var(--text-muted);"><i class="fa-solid fa-circle" style="color: var(--color-emerald); font-size: 8px;"></i> All-Time Low Deal Markers</span>
         </div>
         <div style="height: 270px; position: relative;">
@@ -840,7 +840,7 @@ async function submitAddAsins(e) {
  */
 async function checkSchedulerStatus() {
   try {
-    const res = await fetch("/api/scheduler/status");
+    const res = await fetch(`/api/scheduler/status?_t=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
     const el = document.getElementById("schedulerStatusText");
     const ind = document.getElementById("schedulerStatusIndicator");
