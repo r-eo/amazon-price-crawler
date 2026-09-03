@@ -377,28 +377,14 @@ def reconcile_and_repair_corrupted_data() -> Dict[str, Any]:
             # Condition 1: Selling price exceeds MRP
             if cur_price and cur_mrp and cur_price > cur_mrp:
                 needs_repair = True
+                fix_price = round(cur_mrp * 0.8, 2)
             
-            # Condition 2: Absurdly low MRP (< 250) on monitors/stands/hardware
-            if cur_mrp and cur_mrp < 250:
-                needs_repair = True
-                
-            # Condition 3: Check against verified seed if available
-            if seed:
-                seed_mrp = seed.get("mrp", 0)
-                seed_price = seed.get("base_price", 0)
-                # If database MRP is substantially higher than verified seed MRP (> 20% mismatch)
-                if cur_mrp and seed_mrp and cur_mrp > (seed_mrp * 1.20):
+            # Condition 2: Absurdly low or missing price/MRP
+            if not cur_price or cur_price <= 0:
+                if seed and seed.get("base_price"):
                     needs_repair = True
-                if cur_price and seed_mrp and cur_price > (seed_mrp * 1.15):
-                    needs_repair = True
-                if cur_mrp and seed_mrp and cur_mrp < (seed_mrp * 0.25):
-                    needs_repair = True
-                if needs_repair:
-                    fix_mrp = seed_mrp if seed_mrp else cur_mrp
-                    fix_price = seed_price if seed_price else (fix_mrp * 0.75)
-            elif needs_repair:
-                if cur_mrp and cur_price > cur_mrp:
-                    fix_price = round(cur_mrp * 0.8, 2)
+                    fix_price = seed["base_price"]
+                    fix_mrp = seed.get("mrp", cur_mrp)
             
             if needs_repair:
                 cursor.execute("""

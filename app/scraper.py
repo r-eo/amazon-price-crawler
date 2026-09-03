@@ -219,10 +219,38 @@ def scrape_asin_details(
             elif "left in stock" in txt:
                 stock_status = ab.get_text().strip()
 
-    # 3. Live Price Extraction (Strictly scoped within buybox / centerCol to prevent carousel pollution)
+    # 3. Live Price Extraction
     price = None
     if stock_status != "Out of Stock":
-        # Priority 1: Check hidden buybox price input (most accurate on Amazon India)
+        # Priority 0: Twister Plus Structured Buying Options (Official Amazon JSON for lowest available offer)
+        twister_price = None
+        twister = soup.select_one(".twister-plus-buying-options-price-data, [data-twister-buying-options]")
+        if twister:
+            try:
+                import json
+                t_data = json.loads(twister.get_text())
+                t_prices = []
+                for k, opts in t_data.items():
+                    if isinstance(opts, list):
+                        for o in opts:
+                            p_val = o.get("priceAmount")
+                            if p_val and float(p_val) > 0:
+                                t_prices.append(float(p_val))
+                if t_prices:
+                    twister_price = min(t_prices)
+            except Exception:
+                pass
+
+        # Check total price and subtotal widgets
+        for tp_sel in ["#tp_price_block_total_price_ww .a-offscreen", "#tp-tool-tip-subtotal-price-value .a-offscreen", "#tp_price_block_total_price_ww .a-price-whole"]:
+            tp_elem = soup.select_one(tp_sel)
+            if tp_elem:
+                tp_val = parse_price(tp_elem.get_text())
+                if tp_val and tp_val > 0:
+                    twister_price = min(twister_price, tp_val) if twister_price else tp_val
+
+        # Priority 1: Check hidden buybox price input
+        buybox_price = None
         buybox = soup.select_one("#desktop_buybox") or soup.select_one("#buybox")
         if buybox:
             hidden_price_elem = buybox.select_one('input[name*="customerVisiblePrice"][name*="amount"]')
@@ -230,12 +258,12 @@ def scrape_asin_details(
                 try:
                     val = float(hidden_price_elem.get("value"))
                     if val > 0:
-                        price = val
+                        buybox_price = val
                 except ValueError:
                     pass
 
         # Priority 2: Target specific buybox/core price blocks
-        if not price:
+        if not buybox_price:
             target_blocks = [
                 soup.select_one("#corePriceDisplay_desktop_feature_div"),
                 soup.select_one("#corePrice_feature_div"),
@@ -265,10 +293,15 @@ def scrape_asin_details(
                     if elem:
                         val = parse_price(elem.get_text())
                         if val and val > 0:
-                            price = val
+                            buybox_price = val
                             break
-                if price:
+                if buybox_price:
                     break
+
+        # Always take the lowest verified selling price available on the product page
+        candidates = [p for p in [twister_price, buybox_price] if p and p > 0]
+        if candidates:
+            price = min(candidates)
 
     # 4. MRP Extraction (Strictly within center_col / main area)
     mrp = custom_mrp

@@ -121,7 +121,17 @@ def seed_database_if_empty(force: bool = False):
         if cnt > len(ACER_SEED_PRODUCTS) * (HISTORY_MONTHS_COUNT + 1):
             force = True
 
-    if force or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
+    # Check if existing products on disk still hold old pre-fix MRP/base_price baselines
+    needs_sync = False
+    if existing_products:
+        seed_map = {p["asin"]: p for p in ACER_SEED_PRODUCTS}
+        for p in existing_products:
+            s = seed_map.get(p["asin"])
+            if s and abs(p.get("mrp", 0) - s.get("mrp", 0)) > 50:
+                needs_sync = True
+                break
+
+    if force or needs_sync or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
     elif existing_products and len(existing_products) >= len(ACER_SEED_PRODUCTS):
         # Already populated and matching

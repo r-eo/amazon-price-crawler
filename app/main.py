@@ -311,38 +311,6 @@ def trigger_daily_price_check(
             "message": f"Live Amazon scan updated visible items for {grp_name}! ({len(first_batch)} items scanned, background continuing for remaining)."
         }
 
-@app.get("/api/debug-asin")
-def debug_asin_endpoint(asin: str = "B0DCW28VCS"):
-    from app.scraper import fetch_page_content
-    from bs4 import BeautifulSoup
-    url = f"https://www.amazon.in/dp/{asin}"
-    html = fetch_page_content(url, asin=asin)
-    if not html:
-        return {"error": "Failed to fetch HTML", "asin": asin}
-    
-    soup = BeautifulSoup(html, "html.parser")
-    is_captcha = "Type the characters you see in this image" in html
-    title = soup.select_one("#productTitle")
-    
-    prices_found = []
-    for s in soup.select(".a-price, .priceToPay, #corePriceDisplay_desktop_feature_div, .basisPrice"):
-        prices_found.append({
-            "class": " ".join(s.get("class", [])),
-            "text": s.get_text().strip()
-        })
-        
-    seller = soup.select_one("#sellerProfileTriggerId, #merchant-info")
-    delivery = soup.select_one("#glow-ingress-line2")
-    
-    return {
-        "asin": asin,
-        "is_captcha": is_captcha,
-        "title": title.get_text().strip() if title else None,
-        "seller": seller.get_text().strip() if seller else None,
-        "delivery": delivery.get_text().strip() if delivery else None,
-        "prices_sample": prices_found[:15]
-    }
-
 @app.post("/api/scrape")
 def api_scrape_endpoint(
     background_tasks: BackgroundTasks,
