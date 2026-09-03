@@ -298,8 +298,24 @@ def scrape_asin_details(
                 if buybox_price:
                     break
 
+        # Priority 3: Check All Offers Display / Other Sellers Ingress (Lowest available deal offer)
+        aod_price = None
+        for aod_sel in [
+            "#aod-ingress-link .a-offscreen",
+            "#aod-ingress-link .a-price-whole",
+            "#all-offers-display .a-offscreen",
+            "#all-offers-display .a-price-whole",
+            "#olp_feature_div .a-offscreen",
+            "#dynamic-aod-ingress-box .a-offscreen"
+        ]:
+            aod_elem = soup.select_one(aod_sel)
+            if aod_elem:
+                val = parse_price(aod_elem.get_text())
+                if val and val > 0:
+                    aod_price = min(aod_price, val) if aod_price else val
+
         # Always take the lowest verified selling price available on the product page
-        candidates = [p for p in [twister_price, buybox_price] if p and p > 0]
+        candidates = [p for p in [twister_price, aod_price, buybox_price] if p and p > 0]
         if candidates:
             price = min(candidates)
 
