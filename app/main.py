@@ -196,7 +196,7 @@ class MarkAlertsRequest(BaseModel):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "version": "3.3.0", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "version": "3.4.0", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/scheduler/status")
 def scheduler_status():

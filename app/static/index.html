@@ -19,7 +19,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <!-- Modern Slate & Cyber Gradient CSS -->
-  <link rel="stylesheet" href="/css/style.css?v=4.0.3">
+  <link rel="stylesheet" href="/css/style.css?v=4.0.4">
 </head>
 <body>
   <div class="app-layout">
@@ -107,6 +107,12 @@
 
           <!-- Action Buttons Group -->
           <div class="nav-actions">
+            <!-- Download Dedicated Group Excel Report -->
+            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
+              <i class="fa-solid fa-file-excel"></i>
+              <span id="downloadBtnText">Export Excel</span>
+            </a>
+
             <!-- Check Prices Now (Instant Daily Scan) -->
             <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()" title="Trigger instant price drop check">
               <i class="fa-solid fa-bolt"></i>
@@ -118,18 +124,6 @@
               <i class="fa-solid fa-plus"></i>
               <span>Add ASINs</span>
             </button>
-
-            <!-- Live Scrape Active Group Button -->
-            <button id="btnRunScrape" class="btn btn-secondary" onclick="triggerActiveGroupScrape()" title="Crawl live Amazon prices for current tab">
-              <i class="fa-solid fa-rotate"></i>
-              <span id="scrapeBtnText">Scrape Tab</span>
-            </button>
-
-            <!-- Download Dedicated Group Excel Report -->
-            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix">
-              <i class="fa-solid fa-file-excel"></i>
-              <span id="downloadBtnText">Export (.xlsx)</span>
-            </a>
           </div>
         </div>
       </div>
@@ -278,6 +272,10 @@
 
             <div class="toolbar-right">
               <span class="table-count" id="tableResultCount">Showing 0 products</span>
+              <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcelTable" class="btn btn-sm btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
+                <i class="fa-solid fa-file-excel"></i>
+                <span id="downloadTableBtnText">Export Excel</span>
+              </a>
               <button class="btn btn-sm btn-outline" onclick="loadDashboardData()" title="Reload table data">
                 <i class="fa-solid fa-arrows-rotate"></i>
               </button>
@@ -382,7 +380,7 @@
   </div>
 
   <!-- Javascript Modules -->
-  <script src="/js/charts.js?v=4.0.3"></script>
-  <script src="/js/app.js?v=4.0.3"></script>
+  <script src="/js/charts.js?v=4.0.4"></script>
+  <script src="/js/app.js?v=4.0.4"></script>
 </body>
 </html>

@@ -81,29 +81,33 @@ async function switchDashboard(group) {
   // Update Header / Action Buttons
   const downloadBtn = document.getElementById("btnDownloadExcel");
   const downloadText = document.getElementById("downloadBtnText");
+  const downloadTableBtn = document.getElementById("btnDownloadExcelTable");
   const scrapeText = document.getElementById("scrapeBtnText");
   const viewLabel = document.getElementById("currentViewLabel");
   const kpiScopeLabel = document.getElementById("kpiLabelProducts");
   const chartTitle = document.getElementById("chartTitle");
 
   if (group === "acer_monitors") {
-    downloadBtn.href = "/api/export/excel?group=acer_monitors";
-    downloadText.textContent = "Download Monitors Excel (.xlsx)";
-    scrapeText.textContent = "Scrape Monitors Tab";
+    if (downloadBtn) downloadBtn.href = "/api/export/excel?group=acer_monitors";
+    if (downloadText) downloadText.textContent = "Export Excel";
+    if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=acer_monitors";
+    if (scrapeText) scrapeText.textContent = "Scrape Monitors Tab";
     viewLabel.innerHTML = "Viewing: <strong>Acer Monitors & Stands Dashboard</strong>";
     kpiScopeLabel.textContent = "Tracked Hardware";
     chartTitle.textContent = "Acer Monitors & Stands — 6-Month Price Trajectory";
   } else if (group === "other_products") {
-    downloadBtn.href = "/api/export/excel?group=other_products";
-    downloadText.textContent = "Download Accessories Excel (.xlsx)";
-    scrapeText.textContent = "Scrape Accessories Tab";
+    if (downloadBtn) downloadBtn.href = "/api/export/excel?group=other_products";
+    if (downloadText) downloadText.textContent = "Export Excel";
+    if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=other_products";
+    if (scrapeText) scrapeText.textContent = "Scrape Accessories Tab";
     viewLabel.innerHTML = "Viewing: <strong>Other Accessories Dashboard</strong>";
     kpiScopeLabel.textContent = "Tracked Accessories";
     chartTitle.textContent = "Other Accessories — 6-Month Price Trajectory";
   } else {
-    downloadBtn.href = "/api/export/excel?group=all";
-    downloadText.textContent = "Download All Portfolio (.xlsx)";
-    scrapeText.textContent = "Scrape All Portfolio";
+    if (downloadBtn) downloadBtn.href = "/api/export/excel?group=all";
+    if (downloadText) downloadText.textContent = "Export Excel";
+    if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=all";
+    if (scrapeText) scrapeText.textContent = "Scrape All Portfolio";
     viewLabel.innerHTML = "Viewing: <strong>Full 90-Product Portfolio</strong>";
     kpiScopeLabel.textContent = "Total Products";
     chartTitle.textContent = "Overall Portfolio — 6-Month Price Trajectory";
