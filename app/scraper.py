@@ -375,11 +375,38 @@ def scrape_asin_details(
             except ValueError:
                 pass
 
-    # 7. Image
-    image_url = existing.get("image_url") if existing else None
-    img_elem = soup.select_one("#landingImage, #imgBlkFront")
-    if img_elem and img_elem.get("src"):
-        image_url = img_elem.get("src")
+    # 7. Real Product Image Extraction
+    image_url = None
+    # Priority 1: Check main product images for high-res / dynamic URLs
+    for img in soup.select("#landingImage, #imgBlkFront, #main-image"):
+        if img.get("data-old-hires") and img.get("data-old-hires").startswith("http"):
+            image_url = img.get("data-old-hires")
+            break
+        dyn = img.get("data-a-dynamic-image")
+        if dyn:
+            try:
+                import json
+                urls = list(json.loads(dyn).keys())
+                if urls and urls[0].startswith("http"):
+                    image_url = urls[0]
+                    break
+            except Exception:
+                pass
+        src = img.get("src") or ""
+        if src.startswith("http") and not src.startswith("data:"):
+            image_url = src
+            break
+
+    # Priority 2: Fallback to any valid Amazon media image in the left column
+    if not image_url:
+        for img in soup.select("#imageBlock img, #leftCol img"):
+            src = img.get("src") or ""
+            if "media-amazon.com/images/I/" in src and not src.startswith("data:"):
+                image_url = src
+                break
+
+    if not image_url and existing:
+        image_url = existing.get("image_url")
 
     # Group determination
     target_group = group or (existing.get("product_group") if existing else (GROUP_ACER_MONITORS if "monitor" in (category or "").lower() else GROUP_OTHER_PRODUCTS))

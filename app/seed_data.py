@@ -12,7 +12,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 2999.0,
         "rating": 4.1,
         "review_count": 298,
-        "image_url": "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/610REoj1IpL._SL1500_.jpg",
         "url_slug": "acer-ergo-monitor-stand-with-rgb-lights-and-4-port",
         "amazon_link": "https://amzn.in/d/03Gp2VKd",
         "stock_status": "Out of Stock"
@@ -27,7 +27,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 1799.0,
         "rating": 4.3,
         "review_count": 192,
-        "image_url": "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61DFXCjquhL._SL1500_.jpg",
         "url_slug": "acer-ergo-monitor-stand-with-rgb-lights-and-4-port",
         "amazon_link": "https://amzn.in/d/08wi0EN8",
         "stock_status": "In Stock"
@@ -42,7 +42,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 2999.0,
         "rating": 4.0,
         "review_count": 53,
-        "image_url": "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71GFjNV4lIL._SL1500_.jpg",
         "url_slug": "acer-fusionbase-ergo-monitor-stand-with-wireless-c",
         "amazon_link": "https://amzn.in/d/0egJWQkY",
         "stock_status": "Out of Stock"
@@ -57,7 +57,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 1999.0,
         "rating": 3.4,
         "review_count": 14,
-        "image_url": "https://m.media-amazon.com/images/I/61Nl-F3kGLL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81VlU5-LA2L._SL1500_.jpg",
         "url_slug": "deskpro-stand-zc-a01si-4vx",
         "amazon_link": "https://amzn.in/d/0fFAi1pK",
         "stock_status": "In Stock"
@@ -72,7 +72,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 471.0,
         "rating": 3.4,
         "review_count": 8,
-        "image_url": "https://m.media-amazon.com/images/I/71YQkOhyXKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71qmsxQUeyL._SL1500_.jpg",
         "url_slug": "acer-14-privacy-screen-asf14w9ac-80-zc-a01si-18a",
         "amazon_link": "https://amzn.in/d/0jcSu0LD",
         "stock_status": "In Stock"
@@ -87,7 +87,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         "base_price": 654.0,
         "rating": 3.5,
         "review_count": 4,
-        "image_url": "https://m.media-amazon.com/images/I/71YQkOhyXKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/716vp8GnGAL._SL1500_.jpg",
         "url_slug": "acer-15-6-privacy-screen-asf14w9ac-80-zc-a01si-18b",
         "amazon_link": "https://amzn.in/d/0bixuE7R",
         "stock_status": "In Stock"
@@ -105,7 +105,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 429.0,
         "rating": 3.7,
         "review_count": 101,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71YJjGWaGHL._SL1500_.jpg",
         "url_slug": "acer-clearview-transparent-mouse-green-zc-a01si-18",
         "amazon_link": "https://amzn.in/d/0gFTTe4f",
         "stock_status": "In Stock"
@@ -120,7 +120,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 428.0,
         "rating": 3.6,
         "review_count": 37,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61gqfGpXVzL._SL1500_.jpg",
         "url_slug": "acer-clearview-transparent-mouse-white-zc-a01si-18",
         "amazon_link": "https://amzn.in/d/096DqpWo",
         "stock_status": "In Stock"
@@ -135,7 +135,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 399.0,
         "rating": 3.7,
         "review_count": 101,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71OflSCvFYL._SL1500_.jpg",
         "url_slug": "acer-clearview-transparent-mouse-blue-zc-a01si-18e",
         "amazon_link": "https://amzn.in/d/02vcJ7aV",
         "stock_status": "In Stock"
@@ -150,7 +150,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 399.0,
         "rating": 3.7,
         "review_count": 101,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71Oo+Q016SL._SL1500_.jpg",
         "url_slug": "acer-clearview-transparent-mouse-black-zc-a01si-4w",
         "amazon_link": "https://amzn.in/d/02klBboU",
         "stock_status": "In Stock"
@@ -165,7 +165,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 580.0,
         "rating": 4.3,
         "review_count": 483,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71qh6BvmAsL._SL1500_.jpg",
         "url_slug": "wireless-transparent-rechargeable-mouse-grey-os-zc",
         "amazon_link": "https://amzn.in/d/01WsvzuO",
         "stock_status": "In Stock"
@@ -180,7 +180,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 495.0,
         "rating": 4.3,
         "review_count": 483,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71NVFIKSliL._SL1500_.jpg",
         "url_slug": "wireless-transparent-rechargeable-mouse-peach-os-z",
         "amazon_link": "https://amzn.in/d/04hQzsx1",
         "stock_status": "In Stock"
@@ -195,7 +195,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 315.0,
         "rating": 4.2,
         "review_count": 1327,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/41wDHNWqqmL._SL1000_.jpg",
         "url_slug": "acer-wireless-mouse-white-green-5w-50611-004",
         "amazon_link": "https://amzn.in/d/0d8sfi77",
         "stock_status": "In Stock"
@@ -210,7 +210,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 355.0,
         "rating": 4.2,
         "review_count": 1327,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/51zKXH9e23L._SL1500_.jpg",
         "url_slug": "acer-wireless-mouse-white-orange-zc-a01si-0wb",
         "amazon_link": "https://amzn.in/d/01HTqM53",
         "stock_status": "In Stock"
@@ -225,7 +225,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 355.0,
         "rating": 4.2,
         "review_count": 1327,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/51jOAM8+8zL._SL1500_.jpg",
         "url_slug": "acer-wireless-mouse-white-blue-zc-a01si-0wc",
         "amazon_link": "https://amzn.in/d/05Fir8bg",
         "stock_status": "In Stock"
@@ -240,7 +240,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 355.0,
         "rating": 4.2,
         "review_count": 1327,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71cWw7ip0qL._SL1500_.jpg",
         "url_slug": "acer-wireless-mouse-black-red-zc-a01si-3s8",
         "amazon_link": "https://amzn.in/d/0iGTa5NW",
         "stock_status": "In Stock"
@@ -255,7 +255,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 598.0,
         "rating": 4.4,
         "review_count": 203,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61MecoKNwDL._SL1500_.jpg",
         "url_slug": "acer-prism-wireless-rechargeable-mouse-black-zc-a0",
         "amazon_link": "https://amzn.in/d/0drqvfM7",
         "stock_status": "In Stock"
@@ -270,7 +270,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 799.0,
         "rating": 4.4,
         "review_count": 203,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71vQ4nDMN8L._SL1500_.jpg",
         "url_slug": "acer-prism-wireless-rechargeable-mouse-yellow-zc-a",
         "amazon_link": "https://amzn.in/d/02zAZaxY",
         "stock_status": "Out of Stock"
@@ -285,7 +285,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 799.0,
         "rating": 4.4,
         "review_count": 203,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/615BCc-qFqL._SL1500_.jpg",
         "url_slug": "acer-prism-wireless-rechargeable-mouse-white-zc-a0",
         "amazon_link": "https://amzn.in/d/0iA8VsbU",
         "stock_status": "Out of Stock"
@@ -300,7 +300,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 998.0,
         "rating": 3.8,
         "review_count": 186,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61TAZuSmL+L._SL1500_.jpg",
         "url_slug": "acer-ergo-vertical-wireless-mouse-white-zc-a01si-3",
         "amazon_link": "https://amzn.in/d/03p9eVRt",
         "stock_status": "In Stock"
@@ -315,7 +315,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 998.0,
         "rating": 3.8,
         "review_count": 186,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/717BUFALtgL._SL1500_.jpg",
         "url_slug": "acer-ergo-vertical-wireless-mouse-grey-zc-a01si-39",
         "amazon_link": "https://amzn.in/d/0byavpY9",
         "stock_status": "In Stock"
@@ -330,7 +330,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 499.0,
         "rating": 4.3,
         "review_count": 871,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71XWRGOzb-L._SL1500_.jpg",
         "url_slug": "bubble-mouse-blue-green-zc-a01si-2n0",
         "amazon_link": "https://amzn.in/d/0dYfjK4d",
         "stock_status": "Out of Stock"
@@ -345,7 +345,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 499.0,
         "rating": 4.3,
         "review_count": 871,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71RaUC00idL._SL1500_.jpg",
         "url_slug": "bubble-mouse-peach-zc-a01si-2n1",
         "amazon_link": "https://amzn.in/d/05zCkpwR",
         "stock_status": "In Stock"
@@ -360,7 +360,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 499.0,
         "rating": 4.3,
         "review_count": 871,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61Wr9tOYxRL._SL1500_.jpg",
         "url_slug": "bubble-mouse-white-zc-a01si-2mz",
         "amazon_link": "https://amzn.in/d/0iDzqvS3",
         "stock_status": "Out of Stock"
@@ -375,7 +375,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 698.0,
         "rating": 4.2,
         "review_count": 114,
-        "image_url": "https://m.media-amazon.com/images/I/51wJ5rK0kGL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71AmPFtYmHL._SL1500_.jpg",
         "url_slug": "popgo-wireless-mouse-2-4g-bt5-4-dual-mode-zc-a01si",
         "amazon_link": "https://amzn.in/d/01DqOKBG",
         "stock_status": "In Stock"
@@ -390,7 +390,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1499.0,
         "rating": 4.4,
         "review_count": 310,
-        "image_url": "https://m.media-amazon.com/images/I/61gR7G8O6UL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61qjtyIv4lL._SL1500_.jpg",
         "url_slug": "acer-nitro-phantom-x12-tri-mode-gaming-mouse-zc-a0",
         "amazon_link": "https://amzn.in/d/0hb3pkuS",
         "stock_status": "Out of Stock"
@@ -405,7 +405,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 899.0,
         "rating": 4.4,
         "review_count": 310,
-        "image_url": "https://m.media-amazon.com/images/I/61gR7G8O6UL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61JNCNvVtXL._SL1500_.jpg",
         "url_slug": "acer-nitro-phantom-x7-wired-gaming-mouse-7200-dpi-",
         "amazon_link": "https://amzn.in/d/0a2asTCM",
         "stock_status": "Out of Stock"
@@ -420,7 +420,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 899.0,
         "rating": 4.4,
         "review_count": 19,
-        "image_url": "https://m.media-amazon.com/images/I/61gR7G8O6UL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61eU9U99ASL._SL1500_.jpg",
         "url_slug": "nitro-7-gaming-mouse-zc-a01si-3rx",
         "amazon_link": "https://amzn.in/d/0iHFtpej",
         "stock_status": "In Stock"
@@ -435,7 +435,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 575.0,
         "rating": 4.1,
         "review_count": 28,
-        "image_url": "https://m.media-amazon.com/images/I/61gR7G8O6UL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/613sMu0LojL._SL1500_.jpg",
         "url_slug": "acer-titan-x-gaming-mouse-zc-a01si-3ry",
         "amazon_link": "https://amzn.in/d/0cs3yrH9",
         "stock_status": "Only 1 left in stock."
@@ -450,7 +450,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1495.0,
         "rating": 3.9,
         "review_count": 175,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81vlxcYQIJL._SL1500_.jpg",
         "url_slug": "acer-wireless-rechargeable-keyboard-black-with-gre",
         "amazon_link": "https://amzn.in/d/0dZscBFB",
         "stock_status": "In Stock"
@@ -465,7 +465,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1995.0,
         "rating": 3.6,
         "review_count": 352,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81ma1RrYczL._SL1500_.jpg",
         "url_slug": "acer-clearview-wireless-rechargeable-keyboard-silv",
         "amazon_link": "https://amzn.in/d/0db8lr4G",
         "stock_status": "In Stock"
@@ -480,7 +480,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1698.0,
         "rating": 4.3,
         "review_count": 75,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71I4S3Nt7qL._SL1500_.jpg",
         "url_slug": "acer-keypro-wireless-dual-mode-keyboard-space-grey",
         "amazon_link": "https://amzn.in/d/0ah5sBet",
         "stock_status": "In Stock"
@@ -495,7 +495,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1698.0,
         "rating": 4.3,
         "review_count": 75,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71v9YOES30L._SL1500_.jpg",
         "url_slug": "acer-keypro-wireless-dual-mode-keyboard-silver-zc-",
         "amazon_link": "https://amzn.in/d/05dx2Scc",
         "stock_status": "In Stock"
@@ -510,7 +510,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2299.0,
         "rating": 3.9,
         "review_count": 143,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71+U+2hRXXL._SL1500_.jpg",
         "url_slug": "acer-wireless-rechargeable-keyboard-black-with-gre",
         "amazon_link": "https://amzn.in/d/04lyF1ax",
         "stock_status": "Out of Stock"
@@ -525,7 +525,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1113.0,
         "rating": 3.8,
         "review_count": 35,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71fMrvjPbfL._SL1500_.jpg",
         "url_slug": "acer-wireless-rechargeable-keyboard-with-cradle-an",
         "amazon_link": "https://amzn.in/d/02knIdjO",
         "stock_status": "In Stock"
@@ -540,7 +540,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2299.0,
         "rating": 4.0,
         "review_count": 18,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71V0dJYfCeL._SL1500_.jpg",
         "url_slug": "acer-solar-keyboard-zc-a01si-1lh",
         "amazon_link": "https://amzn.in/d/0dnY3fzz",
         "stock_status": "Out of Stock"
@@ -555,7 +555,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1199.0,
         "rating": 4.0,
         "review_count": 24,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71lSEaT0jsL._SL1500_.jpg",
         "url_slug": "acer-softkey-pro-wireless-keyboard-2-4ghz-zc-a01si",
         "amazon_link": "https://amzn.in/d/07t1OXTz",
         "stock_status": "Out of Stock"
@@ -570,7 +570,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1999.0,
         "rating": 3.5,
         "review_count": 34,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81ZdVORcT9L._SL1500_.jpg",
         "url_slug": "acer-trifold-pro-60-keys-foldable-zc-a01si-39x",
         "amazon_link": "https://amzn.in/d/0j4CJByc",
         "stock_status": "In Stock"
@@ -585,7 +585,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2098.0,
         "rating": 3.4,
         "review_count": 40,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81n5tV9xFEL._SL1500_.jpg",
         "url_slug": "acer-fold-max-99-keys-zc-a01si-39y",
         "amazon_link": "https://amzn.in/d/07fZITfY",
         "stock_status": "In Stock"
@@ -600,7 +600,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2299.0,
         "rating": 4.0,
         "review_count": 98,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71FSalzPqeL._SL1500_.jpg",
         "url_slug": "acer-mini-fold-67-keys-compact-zc-a01si-39z",
         "amazon_link": "https://amzn.in/d/091waa5V",
         "stock_status": "Out of Stock"
@@ -615,7 +615,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1199.0,
         "rating": 2.8,
         "review_count": 73,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71-c+qkae4L._SL1500_.jpg",
         "url_slug": "acer-nanopad-touch-green-zc-a01si-4yv",
         "amazon_link": "https://amzn.in/d/0hKaWdc5",
         "stock_status": "In Stock"
@@ -630,7 +630,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 899.0,
         "rating": 2.8,
         "review_count": 73,
-        "image_url": "https://m.media-amazon.com/images/I/61Bq-4O93tL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71Ku1ZHaOXL._SL1500_.jpg",
         "url_slug": "acer-nanopad-touch-peach-zc-a01si-4yu",
         "amazon_link": "https://amzn.in/d/0h1ZTet3",
         "stock_status": "In Stock"
@@ -645,7 +645,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1099.0,
         "rating": 3.8,
         "review_count": 1468,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/7157dBNL9LL._SL1500_.jpg",
         "url_slug": "acer-wireless-kbd-mouse-white-gray-combo-zc-a01si-",
         "amazon_link": "https://amzn.in/d/05wObS7l",
         "stock_status": "Only 2 left in stock."
@@ -660,7 +660,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1299.0,
         "rating": 3.9,
         "review_count": 201,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/718s8LifBeL._SL1500_.jpg",
         "url_slug": "acer-fusion-wireless-kbd-mouse-black-silver-combo-",
         "amazon_link": "https://amzn.in/d/00oXwCPx",
         "stock_status": "In Stock"
@@ -675,7 +675,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 698.0,
         "rating": 4.2,
         "review_count": 114,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71rgztpcpkL._SL1500_.jpg",
         "url_slug": "acer-palmease-wired-keyboard-mouse-combo-with-palm",
         "amazon_link": "https://amzn.in/d/0cvhC7Ds",
         "stock_status": "In Stock"
@@ -690,7 +690,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1099.0,
         "rating": 3.3,
         "review_count": 84,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71JogHAjw3L._SL1500_.jpg",
         "url_slug": "acer-officemate-wired-keyboard-mouse-combo-black-z",
         "amazon_link": "https://amzn.in/d/0fvxtU2O",
         "stock_status": "Out of Stock"
@@ -705,7 +705,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 599.0,
         "rating": 3.3,
         "review_count": 84,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/710zUWN-ZCL._SL1500_.jpg",
         "url_slug": "acer-officemate-wired-keyboard-mouse-combo-white-z",
         "amazon_link": "https://amzn.in/d/0d0nItAm",
         "stock_status": "In Stock"
@@ -720,7 +720,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 949.0,
         "rating": 3.8,
         "review_count": 73,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71gxJKoZptL._SL1500_.jpg",
         "url_slug": "acer-palmease-wireless-keyboard-mouse-combo-with-p",
         "amazon_link": "https://amzn.in/d/0bPFvu98",
         "stock_status": "In Stock"
@@ -735,7 +735,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1149.0,
         "rating": 3.8,
         "review_count": 73,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61i2-mNIrML._SL1500_.jpg",
         "url_slug": "acer-palmease-wireless-keyboard-mouse-combo-with-p",
         "amazon_link": "https://amzn.in/d/028vmivd",
         "stock_status": "In Stock"
@@ -750,7 +750,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1099.0,
         "rating": 3.4,
         "review_count": 944,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/612DWHDVsHL._SL1500_.jpg",
         "url_slug": "acer-nano-pad-combo-black-zc-a01si-223",
         "amazon_link": "https://amzn.in/d/0e0IBHGC",
         "stock_status": "Out of Stock"
@@ -765,7 +765,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 999.0,
         "rating": 3.4,
         "review_count": 944,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71e3gwEBcAL._SL1500_.jpg",
         "url_slug": "acer-nano-pad-combo-purple-zc-a01si-3bh",
         "amazon_link": "https://amzn.in/d/0iKvJyBx",
         "stock_status": "In Stock"
@@ -780,7 +780,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1398.0,
         "rating": 3.0,
         "review_count": 249,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/713AuC+vzUL._SL1500_.jpg",
         "url_slug": "acer-zenkeys-duos-black-lime-zc-a01si-3r2",
         "amazon_link": "https://amzn.in/d/0fVcwg3C",
         "stock_status": "In Stock"
@@ -795,7 +795,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1099.0,
         "rating": 3.0,
         "review_count": 249,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71+T2spJm2L._SL1500_.jpg",
         "url_slug": "acer-zenkeys-duos-white-blue-zc-a01si-3r3",
         "amazon_link": "https://amzn.in/d/00Sw1xzi",
         "stock_status": "Out of Stock"
@@ -810,7 +810,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 899.0,
         "rating": 4.0,
         "review_count": 8,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71mn9to+zJL._SL1500_.jpg",
         "url_slug": "acer-officelite-km-300-wl-combo-black-dy-zc-a01si-",
         "amazon_link": "https://amzn.in/d/0e1xb7cm",
         "stock_status": "In Stock"
@@ -825,7 +825,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1048.0,
         "rating": 4.0,
         "review_count": 8,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71+1Ok3Rs+L._SL1500_.jpg",
         "url_slug": "acer-officelite-km-300-wl-combo-white-grey-dy-zc-a",
         "amazon_link": "https://amzn.in/d/00A3nlLp",
         "stock_status": "In Stock"
@@ -840,7 +840,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1459.0,
         "rating": 3.3,
         "review_count": 55,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71fE3RKnXdL._SL1500_.jpg",
         "url_slug": "acer-redshift-wireless-keyboard-mouse-combo-zc-a01",
         "amazon_link": "https://amzn.in/d/06sEKkEz",
         "stock_status": "In Stock"
@@ -855,7 +855,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1599.0,
         "rating": 3.4,
         "review_count": 132,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/715Qzq1XMlL._SL1500_.jpg",
         "url_slug": "acer-cuteo-keyboard-mouse-combo-pink-zc-a01si-18n",
         "amazon_link": "https://amzn.in/d/03s6F5mt",
         "stock_status": "In Stock"
@@ -870,7 +870,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1499.0,
         "rating": 3.8,
         "review_count": 9,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71srROxXWpL._SL1500_.jpg",
         "url_slug": "acer-popgo-wireless-combo-beige-zc-a01si-4yn",
         "amazon_link": "https://amzn.in/d/0ecovzK7",
         "stock_status": "In Stock"
@@ -885,7 +885,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1499.0,
         "rating": 3.8,
         "review_count": 9,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/710fsFXgaPL._SL1500_.jpg",
         "url_slug": "acer-popgo-wireless-combo-purple-zc-a01si-4yp",
         "amazon_link": "https://amzn.in/d/014JfY3b",
         "stock_status": "In Stock"
@@ -900,7 +900,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1999.0,
         "rating": 3.8,
         "review_count": 179,
-        "image_url": "https://m.media-amazon.com/images/I/61vjG9-T3fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81JilIXX68L._SL1500_.jpg",
         "url_slug": "acer-alg-4-in-1-combo-zc-a01si-1lg",
         "amazon_link": "https://amzn.in/d/0dd5h6uG",
         "stock_status": "In Stock"
@@ -915,7 +915,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2799.0,
         "rating": 4.6,
         "review_count": 6,
-        "image_url": "https://m.media-amazon.com/images/I/71rQ6W9Z5fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71gllABTI4L._SL1500_.jpg",
         "url_slug": "predator-aethon-303-gp-kbd11-048",
         "amazon_link": "https://amzn.in/d/02h2iZTD",
         "stock_status": "Out of Stock"
@@ -930,7 +930,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 3999.0,
         "rating": 4.1,
         "review_count": 8,
-        "image_url": "https://m.media-amazon.com/images/I/71rQ6W9Z5fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61J0UQRjvML._SL1500_.jpg",
         "url_slug": "predator-aethon-330-gp-kbd11-04a",
         "amazon_link": "https://amzn.in/d/053R055F",
         "stock_status": "In Stock"
@@ -945,7 +945,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2398.0,
         "rating": 3.9,
         "review_count": 113,
-        "image_url": "https://m.media-amazon.com/images/I/71rQ6W9Z5fL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81T3b9Fw76L._SL1500_.jpg",
         "url_slug": "acer-nitro-g-wired-mechanical-gaming-keyboard-zc-a",
         "amazon_link": "https://amzn.in/d/0awRxZWI",
         "stock_status": "In Stock"
@@ -960,7 +960,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1699.0,
         "rating": 4.0,
         "review_count": 160,
-        "image_url": "https://m.media-amazon.com/images/I/61H3lR-3sTL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71wGpUdWCrL._SL1500_.jpg",
         "url_slug": "nitro-wired-gaming-headset-np-hds1a-008",
         "amazon_link": "https://amzn.in/d/032kanBK",
         "stock_status": "Out of Stock"
@@ -975,7 +975,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1476.0,
         "rating": 4.0,
         "review_count": 31,
-        "image_url": "https://m.media-amazon.com/images/I/61H3lR-3sTL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71H9SFO10wL._SL1500_.jpg",
         "url_slug": "nitro-wired-gaming-headset-zc-a01si-395",
         "amazon_link": "https://amzn.in/d/0anrVGEF",
         "stock_status": "In Stock"
@@ -990,7 +990,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 3453.0,
         "rating": 3.6,
         "review_count": 42,
-        "image_url": "https://m.media-amazon.com/images/I/61H3lR-3sTL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71+WYMQs2ZL._SL1500_.jpg",
         "url_slug": "nitro-wireless-4-in-1-headset-7-1-surround-zc-a01s",
         "amazon_link": "https://amzn.in/d/01GLG4A7",
         "stock_status": "In Stock"
@@ -1005,7 +1005,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1599.0,
         "rating": 4.2,
         "review_count": 190,
-        "image_url": "https://m.media-amazon.com/images/I/61H3lR-3sTL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71oIZunL6WL._SL1500_.jpg",
         "url_slug": "nitro-phatom-headset-zc-a01si-4yr",
         "amazon_link": "https://amzn.in/d/05gaWPCq",
         "stock_status": "In Stock"
@@ -1020,7 +1020,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1888.0,
         "rating": 3.9,
         "review_count": 22,
-        "image_url": "https://m.media-amazon.com/images/I/61kY8O8m4xL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/714pN+PB1jL._SL1500_.jpg",
         "url_slug": "dreamwave-speaker-zc-a01si-3lg",
         "amazon_link": "https://amzn.in/d/0gaJ0c9Q",
         "stock_status": "In Stock"
@@ -1035,7 +1035,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2423.0,
         "rating": 4.9,
         "review_count": 38,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71+F53KqcsL._SL1500_.jpg",
         "url_slug": "new-predator-backpack-zc-a01si-3bu",
         "amazon_link": "https://amzn.in/d/04v36OgI",
         "stock_status": "In Stock"
@@ -1050,7 +1050,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1995.0,
         "rating": 4.3,
         "review_count": 255,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71lneMiBDqL._SL1500_.jpg",
         "url_slug": "acer-estilo-beige-zc-a01si-1b7",
         "amazon_link": "https://amzn.in/d/05L9cSW5",
         "stock_status": "In Stock"
@@ -1065,7 +1065,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1718.0,
         "rating": 4.2,
         "review_count": 25,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71tsL1BakEL._SL1500_.jpg",
         "url_slug": "acer-estilo-black-zc-a01si-3fj",
         "amazon_link": "https://amzn.in/d/0bcvRtma",
         "stock_status": "In Stock"
@@ -1080,7 +1080,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1391.0,
         "rating": 4.3,
         "review_count": 178,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71TVEpNun0L._SL1500_.jpg",
         "url_slug": "acer-sling-bag-green-zc-a01si-1b5",
         "amazon_link": "https://amzn.in/d/02hunQ83",
         "stock_status": "In Stock"
@@ -1095,7 +1095,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 944.0,
         "rating": 4.3,
         "review_count": 47,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61PFwGE3BEL._SL1500_.jpg",
         "url_slug": "acer-sling-bag-grey-zc-a01si-1b6",
         "amazon_link": "https://amzn.in/d/07NNp9EU",
         "stock_status": "In Stock"
@@ -1110,7 +1110,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1299.0,
         "rating": 4.3,
         "review_count": 178,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71MOWm9++oL._SL1500_.jpg",
         "url_slug": "acer-sling-bag-black-zc-a01si-3la",
         "amazon_link": "https://amzn.in/d/0736fmpt",
         "stock_status": "In Stock"
@@ -1125,7 +1125,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1899.0,
         "rating": 3.6,
         "review_count": 37,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71kzj5TWOXL._SL1500_.jpg",
         "url_slug": "acer-chargemate-4-in-1-wireless-charging-laptop-sl",
         "amazon_link": "https://amzn.in/d/0ih18G5u",
         "stock_status": "In Stock"
@@ -1140,7 +1140,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1899.0,
         "rating": 3.6,
         "review_count": 37,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71tDHc4po7L._SL1500_.jpg",
         "url_slug": "acer-chargemate-4-in-1-wireless-charging-laptop-sl",
         "amazon_link": "https://amzn.in/d/0ii9l0h2",
         "stock_status": "In Stock"
@@ -1155,7 +1155,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 932.0,
         "rating": 4.4,
         "review_count": 37,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71JS7IA6aOL._SL1500_.jpg",
         "url_slug": "acer-cross-body-bag-zc-a01si-3hb",
         "amazon_link": "https://amzn.in/d/0acVoJ1E",
         "stock_status": "In Stock"
@@ -1170,7 +1170,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1444.0,
         "rating": 4.4,
         "review_count": 50,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/815Zn+MH1nL._SL1500_.jpg",
         "url_slug": "acer-urbanlite-slim-zc-a01si-3bv",
         "amazon_link": "https://amzn.in/d/029BJiPl",
         "stock_status": "In Stock"
@@ -1185,7 +1185,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 508.0,
         "rating": 3.8,
         "review_count": 167,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81RL4Ewy9ML._SL1500_.jpg",
         "url_slug": "acer-pulse-backpack-yellow-navy-blue-zc-a01si-21x",
         "amazon_link": "https://amzn.in/d/09VAgml9",
         "stock_status": "In Stock"
@@ -1200,7 +1200,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 799.0,
         "rating": 3.8,
         "review_count": 167,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81aEpO3s50L._SL1500_.jpg",
         "url_slug": "acer-pulse-backpack-silver-navy-blue-zc-a01si-21y",
         "amazon_link": "https://amzn.in/d/07a22lJr",
         "stock_status": "In Stock"
@@ -1215,7 +1215,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1299.0,
         "rating": 3.8,
         "review_count": 167,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81554-3L0uL._SL1500_.jpg",
         "url_slug": "acer-pulse-backpack-black-maroon-zc-a01si-3vp",
         "amazon_link": "https://amzn.in/d/0anqBsVY",
         "stock_status": "In Stock"
@@ -1230,7 +1230,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1299.0,
         "rating": 4.4,
         "review_count": 36,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61uq1vvbtLL._SL1500_.jpg",
         "url_slug": "acer-swift-2-in-one-convertible-backpack-navy-blue",
         "amazon_link": "https://amzn.in/d/0hVfDqZG",
         "stock_status": "Out of Stock"
@@ -1245,7 +1245,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2354.0,
         "rating": 4.4,
         "review_count": 36,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61fk7P3g9HL._SL1500_.jpg",
         "url_slug": "acer-swift-2-in-one-convertible-backpack-tan-zc-a0",
         "amazon_link": "https://amzn.in/d/0dHU9YZv",
         "stock_status": "In Stock"
@@ -1260,7 +1260,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 3068.0,
         "rating": 4.6,
         "review_count": 51,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81qjCRAw8YL._SL1500_.jpg",
         "url_slug": "acer-premium-business-laptop-backpack-zc-a01si-1qp",
         "amazon_link": "https://amzn.in/d/0iNKWFIP",
         "stock_status": "In Stock"
@@ -1275,7 +1275,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2036.0,
         "rating": 3.5,
         "review_count": 8,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/81c7V8ALeGL._SL1500_.jpg",
         "url_slug": "acer-premium-professional-laptop-backpack-zc-a01si",
         "amazon_link": "https://amzn.in/d/0bibRtB8",
         "stock_status": "In Stock"
@@ -1290,7 +1290,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 5998.0,
         "rating": 4.3,
         "review_count": 19,
-        "image_url": "https://m.media-amazon.com/images/I/71uK+b-jMlL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/71LIdOGincL._SL1500_.jpg",
         "url_slug": "acer-vacupack-backpack-zc-a01si-4mb",
         "amazon_link": "https://amzn.in/d/0j5fMhx6",
         "stock_status": "In Stock"
@@ -1305,7 +1305,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2202.0,
         "rating": 4.3,
         "review_count": 43,
-        "image_url": "https://m.media-amazon.com/images/I/61+9F1z-uKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61luv7mjsGL._SL1500_.jpg",
         "url_slug": "management-power-strip-zc-a01si-2p1",
         "amazon_link": "https://amzn.in/d/0epw1kGk",
         "stock_status": "In Stock"
@@ -1320,7 +1320,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2765.0,
         "rating": 3.9,
         "review_count": 74,
-        "image_url": "https://m.media-amazon.com/images/I/61+9F1z-uKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61rMD55JqgL._SL1500_.jpg",
         "url_slug": "wifi-smart-power-strip-zc-a01si-2p2",
         "amazon_link": "https://amzn.in/d/00SX8Ctx",
         "stock_status": "In Stock"
@@ -1335,7 +1335,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 1499.0,
         "rating": 4.4,
         "review_count": 113,
-        "image_url": "https://m.media-amazon.com/images/I/61+9F1z-uKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/614zwFtp-uL._SL1500_.jpg",
         "url_slug": "tower-extension-zc-a01si-2p3",
         "amazon_link": "https://amzn.in/d/0h32ZOIv",
         "stock_status": "Out of Stock"
@@ -1350,7 +1350,7 @@ ACER_OTHER_SEED_PRODUCTS = [
         "base_price": 2385.0,
         "rating": 4.2,
         "review_count": 71,
-        "image_url": "https://m.media-amazon.com/images/I/61+9F1z-uKL._SX679_.jpg",
+        "image_url": "https://m.media-amazon.com/images/I/61dspGUaE3L._SL1500_.jpg",
         "url_slug": "tubo-gan-strip-zc-a01si-2p4",
         "amazon_link": "https://amzn.in/d/04WN2Fzz",
         "stock_status": "In Stock"

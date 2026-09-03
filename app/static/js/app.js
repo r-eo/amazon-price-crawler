@@ -339,7 +339,7 @@ function renderProductsTable(products) {
     const hasPriceDrop = stats.avg_price && p.current_price < stats.avg_price;
 
     const imgTag = p.image_url
-      ? `<img src="${p.image_url}" alt="thumb" class="product-thumb" loading="lazy" onerror="this.src='https://placehold.co/48x48/1E293B/94A3B8?text=Acer'">`
+      ? `<img src="${p.image_url}" alt="thumb" class="product-thumb" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/48x48/1E293B/94A3B8?text=Acer'">`
       : `<i class="fa-solid fa-microchip" style="color: var(--color-indigo); font-size: 20px;"></i>`;
 
     tr.innerHTML = `

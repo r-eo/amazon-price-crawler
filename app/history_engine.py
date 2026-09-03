@@ -131,6 +131,16 @@ def seed_database_if_empty(force: bool = False):
                 needs_sync = True
                 break
 
+    # Ensure authentic product image URLs from catalog are synchronized into SQLite
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        for s in ACER_SEED_PRODUCTS:
+            if s.get("image_url"):
+                cursor.execute(
+                    "UPDATE products SET image_url = ? WHERE asin = ? AND (image_url != ? OR image_url IS NULL)",
+                    (s["image_url"], s["asin"], s["image_url"])
+                )
+
     if force or needs_sync or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
     elif existing_products and len(existing_products) >= len(ACER_SEED_PRODUCTS):
