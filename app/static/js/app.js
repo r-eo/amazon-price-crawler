@@ -232,10 +232,8 @@ function applyFiltersAndRenderTable() {
       if (!p.stats || !p.stats.is_atl) return false;
     }
     if (priceDropFilterActive) {
-      // Check if price is lower than average or has price drop
       const stats = p.stats || {};
-      const hasDrop = (stats.avg_price && p.current_price < stats.avg_price) || stats.is_atl;
-      if (!hasDrop) return false;
+      if (!stats.has_price_drop) return false;
     }
     return true;
   });
@@ -339,7 +337,7 @@ function renderProductsTable(products) {
     const isAtl = stats.is_atl;
     const discount = stats.discount_from_mrp || 0;
     const inStock = (p.stock_status || "").toLowerCase().includes("in stock");
-    const hasPriceDrop = stats.avg_price && p.current_price < stats.avg_price;
+    const hasPriceDrop = !!stats.has_price_drop;
 
     const imgTag = p.image_url
       ? `<img src="${p.image_url}" alt="thumb" class="product-thumb" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/48x48/1E293B/94A3B8?text=Acer'">`
@@ -377,9 +375,10 @@ function renderProductsTable(products) {
         <span class="badge badge-indigo">${p.category}</span>
       </td>
       <td class="text-right">
-        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
           <span class="price-val" style="color: #0f172a; font-weight: 700; font-size: 14px;">${currencySymbol}${Math.round(p.current_price || 0).toLocaleString()}</span>
-          ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ATL DEAL</span>` : (hasPriceDrop ? `<span class="badge-drop"><i class="fa-solid fa-arrow-trend-down"></i> DROPPED</span>` : "")}
+          ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ATL DEAL</span>` : ""}
+          ${hasPriceDrop ? `<span class="badge-drop" title="Dropped by ${currencySymbol}${Math.round(stats.drop_amount || 0).toLocaleString()} (${stats.drop_pct || 0}%) from previous price ${currencySymbol}${Math.round(stats.prev_price || 0).toLocaleString()}"><i class="fa-solid fa-arrow-trend-down"></i> ${stats.drop_pct ? `-${stats.drop_pct}%` : 'DROPPED'}</span>` : ""}
         </div>
       </td>
       <td class="text-right">
@@ -744,6 +743,11 @@ async function openProductDetailModal(asin) {
           <span class="modal-stat-label">6-Month Average</span>
           <span class="modal-stat-val" style="color: var(--color-indigo); font-weight: 700;">${currencySymbol}${Math.round(stats.avg_price || p.current_price).toLocaleString()}</span>
         </div>
+        ${stats.has_price_drop ? `
+        <div class="modal-stat-box" style="border-color: rgba(217, 119, 6, 0.4); background: rgba(217, 119, 6, 0.05);">
+          <span class="modal-stat-label" style="color: #d97706;"><i class="fa-solid fa-arrow-trend-down"></i> Active Price Drop</span>
+          <span class="modal-stat-val" style="color: #d97706; font-weight: 700;">-${stats.drop_pct}% (-${currencySymbol}${Math.round(stats.drop_amount).toLocaleString()})</span>
+        </div>` : ''}
       </div>
 
       <div style="background-color: var(--bg-input); border: 1px solid var(--border-card); border-radius: var(--radius-md); padding: 18px;">

@@ -390,7 +390,7 @@ def get_all_price_history() -> List[Dict[str, Any]]:
         return [dict(row) for row in rows]
 
 def get_product_statistics(asin: str) -> Dict[str, Any]:
-    """Calculates min, max, avg, and deal status for an ASIN."""
+    """Calculates min, max, avg, price drop, and deal status for an ASIN."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -423,6 +423,28 @@ def get_product_statistics(asin: str) -> Dict[str, Any]:
         is_atl = current_price <= (min_price * 1.01) # within 1% of all-time low
         is_near_atl = current_price <= (min_price * 1.05) # within 5% of ATL
         
+        # Check for price drop compared to previous recorded check
+        cursor.execute("""
+            SELECT price FROM price_history 
+            WHERE asin = ? 
+            ORDER BY timestamp DESC, id DESC 
+            LIMIT 2
+        """, (asin,))
+        recent_points = cursor.fetchall()
+        
+        has_price_drop = False
+        prev_price = None
+        drop_amount = 0.0
+        drop_pct = 0.0
+        
+        if len(recent_points) >= 2:
+            prev_price = recent_points[1]["price"]
+            diff = prev_price - current_price
+            if diff > 0:
+                has_price_drop = True
+                drop_amount = round(diff, 2)
+                drop_pct = round((diff / prev_price) * 100, 1) if prev_price > 0 else 0.0
+        
         return {
             "asin": asin,
             "current_price": current_price,
@@ -436,6 +458,10 @@ def get_product_statistics(asin: str) -> Dict[str, Any]:
             "diff_from_atl": diff_from_atl,
             "is_atl": is_atl,
             "is_near_atl": is_near_atl,
+            "has_price_drop": has_price_drop,
+            "prev_price": prev_price,
+            "drop_amount": drop_amount,
+            "drop_pct": drop_pct,
         }
 
 def reconcile_and_repair_corrupted_data() -> Dict[str, Any]:

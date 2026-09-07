@@ -356,10 +356,8 @@ def list_products(
                 continue
                 
         stats = get_product_statistics(p["asin"])
-        if price_drops_only:
-            hist = get_price_history_for_asin(p["asin"])
-            if len(hist) < 2 or hist[-1]["price"] >= hist[-2]["price"]:
-                continue
+        if price_drops_only and not stats.get("has_price_drop"):
+            continue
 
         p_dict = dict(p)
         p_dict["stats"] = stats
