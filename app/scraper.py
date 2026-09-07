@@ -411,8 +411,14 @@ def scrape_asin_details(
         image_url = existing.get("image_url")
 
     # Render Free Tier Memory Optimization: Free DOM tree from memory immediately
-    del soup
-    del html_content
+    try:
+        del soup
+    except Exception:
+        pass
+    try:
+        del html
+    except Exception:
+        pass
     gc.collect()
 
     now_str = now_ist_str()

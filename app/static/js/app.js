@@ -25,8 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function initApp() {
-  await fetchTabCounts();
-  await loadDashboardData();
+  await switchDashboard(currentGroup);
   await fetchNotifications();
   await checkSchedulerStatus();
   updateBrowserNotificationButton();
@@ -88,9 +87,9 @@ async function switchDashboard(group) {
     if (downloadText) downloadText.textContent = "Export Excel";
     if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=acer_monitors";
     if (scrapeText) scrapeText.textContent = "Scrape Monitors Tab";
-    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Acer Monitors Dashboard (Catalog Pending)</strong>";
-    if (kpiScopeLabel) kpiScopeLabel.textContent = "Tracked Monitors";
-    if (chartTitle) chartTitle.textContent = "Acer Monitors — 6-Month Price Trajectory";
+    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Acer Monitors & Stands Dashboard</strong>";
+    if (kpiScopeLabel) kpiScopeLabel.textContent = "Tracked Hardware";
+    if (chartTitle) chartTitle.textContent = "Acer Monitors & Stands — 6-Month Price Trajectory";
   } else if (group === "other_products") {
     if (downloadBtn) downloadBtn.href = "/api/export/excel?group=other_products";
     if (downloadText) downloadText.textContent = "Export Excel";
@@ -431,6 +430,8 @@ function toggleNotificationPanel(e) {
   if (panel) {
     panel.classList.toggle("active", notificationPanelOpen);
   }
+}
+
 function closeNotificationPanel() {
   notificationPanelOpen = false;
   const panel = document.getElementById("notificationPanel");

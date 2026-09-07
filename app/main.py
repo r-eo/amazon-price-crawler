@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, Body
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -143,6 +143,10 @@ class MarkAlertsRequest(BaseModel):
 @app.get("/api/health")
 def health_check():
     return {"status": "healthy", "version": "4.0.0", "timestamp": now_ist_str()}
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(content=b"", media_type="image/x-icon")
 
 @app.get("/api/scheduler/status")
 def scheduler_status():
@@ -338,7 +342,7 @@ def list_products(
     Memory-efficient: no automatic background crawl tasks attached to regular page views.
     """
     products = get_products_by_group(group)
-    if not products:
+    if not products and not get_all_products():
         seed_database_if_empty()
         products = get_products_by_group(group)
 
@@ -446,7 +450,7 @@ def get_dashboard_stats(
 ):
     """Calculates overall statistics and KPI aggregations for the requested dashboard group."""
     products = get_products_by_group(group)
-    if not products:
+    if not products and not get_all_products():
         seed_database_if_empty()
         products = get_products_by_group(group)
     if not products:
