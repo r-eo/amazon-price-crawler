@@ -301,7 +301,7 @@
                   <th style="width: 100px;" class="text-center">Discount</th>
                   <th style="width: 110px;" class="text-center">6-Mo Low</th>
                   <th style="width: 100px;" class="text-center">Stock</th>
-                  <th style="width: 130px;" class="text-center">Actions</th>
+                  <th style="width: 165px;" class="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody id="productsTableBody">
@@ -371,6 +371,26 @@
       </div>
     </div>
 
+    <!-- Instant Amazon Snapshot Drawer & Overlay -->
+    <div id="snapshotDrawerOverlay" class="snapshot-drawer-overlay" onclick="closeSnapshotDrawer()"></div>
+    <aside id="snapshotDrawer" class="snapshot-drawer" aria-hidden="true">
+      <div class="snapshot-drawer-header">
+        <div class="drawer-header-left">
+          <span class="badge badge-indigo" id="drawerCategory">Accessories</span>
+          <span class="asin-code" id="drawerAsin" title="Click to copy ASIN" onclick="copyDrawerAsin()">--</span>
+        </div>
+        <div class="drawer-header-actions">
+          <button class="btn btn-xs btn-amber" id="drawerBtnMiniBrowser" onclick="launchDrawerMiniBrowser()" title="Launch Amazon Mini Browser Side-by-Side">
+            <i class="fa-solid fa-table-columns"></i> Side-by-Side
+          </button>
+          <button class="drawer-close-btn" onclick="closeSnapshotDrawer()" title="Close Drawer">&times;</button>
+        </div>
+      </div>
+      <div class="snapshot-drawer-body" id="drawerBody">
+        <!-- Dynamically populated via openSnapshotDrawer() -->
+      </div>
+    </aside>
+
     <!-- Notification Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
 
@@ -386,7 +406,7 @@
   </div>
 
   <!-- Javascript Modules -->
-  <script src="/js/charts.js?v=4.0.5"></script>
-  <script src="/js/app.js?v=4.0.5"></script>
+  <script src="/js/charts.js?v=4.1.0"></script>
+  <script src="/js/app.js?v=4.1.0"></script>
 </body>
 </html>

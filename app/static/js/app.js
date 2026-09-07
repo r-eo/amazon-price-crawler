@@ -345,7 +345,7 @@ function renderProductsTable(products) {
 
     tr.innerHTML = `
       <td>
-        <div class="product-thumb-container">
+        <div class="product-thumb-container" onclick="openSnapshotDrawer('${p.asin}')" title="Click to view Instant Snapshot" style="cursor: pointer;">
           ${imgTag}
         </div>
       </td>
@@ -399,6 +399,12 @@ function renderProductsTable(products) {
       </td>
       <td class="text-center">
         <div class="action-buttons">
+          <button class="btn btn-icon btn-outline" onclick="openSnapshotDrawer('${p.asin}')" title="Instant Amazon Snapshot Drawer (Quick Details & Pricing)">
+            <i class="fa-solid fa-eye" style="color: var(--color-cyan);"></i>
+          </button>
+          <button class="btn btn-icon btn-outline" onclick="openAmazonMiniBrowser('${p.url}')" title="Open Amazon Side-by-Side Mini Browser (Live Cross-Check)">
+            <i class="fa-solid fa-table-columns" style="color: #ea580c;"></i>
+          </button>
           <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 6-Month Price Timeline">
             <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
           </button>
@@ -653,6 +659,9 @@ async function scrapeSingleAsin(asin) {
         if (idx !== -1) {
           allProducts[idx] = { ...allProducts[idx], ...prod };
           applyFiltersAndRenderTable();
+          if (currentDrawerProduct && currentDrawerProduct.asin === asin) {
+            openSnapshotDrawer(asin);
+          }
         }
       }
       await loadDashboardData();
@@ -803,6 +812,7 @@ document.addEventListener("keydown", (e) => {
     closeAddAsinModal();
     closeProductModal();
     closeNotificationPanel();
+    closeSnapshotDrawer();
   }
 });
 
@@ -906,4 +916,194 @@ function showToast(message, type = "info") {
     toast.style.transition = "all 0.3s ease";
     setTimeout(() => toast.remove(), 300);
   }, 4000);
+}
+
+/**
+ * =========================================================================
+ * Instant Snapshot Drawer & Mini Browser Side-by-Side Controller
+ * =========================================================================
+ */
+let currentDrawerProduct = null;
+
+function openSnapshotDrawer(asin) {
+  const product = allProducts.find((p) => p.asin === asin);
+  if (!product) {
+    showToast("Product details not found.", "error");
+    return;
+  }
+  currentDrawerProduct = product;
+
+  const drawer = document.getElementById("snapshotDrawer");
+  const overlay = document.getElementById("snapshotDrawerOverlay");
+  const drawerBody = document.getElementById("drawerBody");
+  const drawerCategory = document.getElementById("drawerCategory");
+  const drawerAsin = document.getElementById("drawerAsin");
+
+  if (drawerCategory) drawerCategory.textContent = product.category || "Accessories";
+  if (drawerAsin) drawerAsin.textContent = product.asin;
+
+  const stats = product.stats || {};
+  const isAtl = stats.is_atl;
+  const hasPriceDrop = !!stats.has_price_drop;
+  const inStock = (product.stock_status || "").toLowerCase().includes("in stock");
+  const discount = stats.discount_from_mrp || 0;
+  const savedAmt = (product.mrp && product.current_price && product.mrp > product.current_price) 
+    ? Math.round(product.mrp - product.current_price) 
+    : 0;
+
+  // Optimize image URL for high resolution preview
+  let highResImg = product.image_url;
+  if (highResImg && highResImg.includes("._")) {
+    highResImg = highResImg.replace(/\._[A-Z0-9_]+_\./, "._SL1000_.");
+  }
+  if (!highResImg) {
+    highResImg = "https://placehold.co/360x360/1E293B/94A3B8?text=Acer";
+  }
+
+  drawerBody.innerHTML = `
+    <!-- Product Visual Card -->
+    <div class="drawer-image-box">
+      <img src="${highResImg}" alt="${product.title}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='${product.image_url || 'https://placehold.co/360x360/1E293B/94A3B8?text=Acer'}'">
+      <a href="${highResImg}" target="_blank" rel="noopener" class="drawer-image-badge" title="Open full resolution image in new tab">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> Zoom
+      </a>
+    </div>
+
+    <!-- Product Title & Metadata -->
+    <div class="drawer-title-section">
+      <div class="drawer-meta-pills">
+        ${product.part_no ? `<span class="badge badge-indigo" style="font-family: var(--font-mono); font-size: 11px;"><i class="fa-solid fa-barcode"></i> ${product.part_no}</span>` : ""}
+        <span class="badge ${inStock ? 'badge-emerald' : 'badge-red'}">
+          <i class="fa-solid ${inStock ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+          ${inStock ? 'In Stock on Amazon' : 'Currently Unavailable'}
+        </span>
+        <span class="product-rating" style="font-size: 12px; font-weight: 600;">
+          <i class="fa-solid fa-star"></i> ${product.rating || 4.2} <span style="color: var(--text-muted); font-weight: normal;">(${(product.review_count || 100).toLocaleString()} reviews)</span>
+        </span>
+      </div>
+      <h3 class="drawer-product-title">${product.title}</h3>
+    </div>
+
+    <!-- Pricing Intelligence Card -->
+    <div class="drawer-price-card">
+      <div class="drawer-price-row">
+        <div>
+          <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block;">Live Amazon Price</span>
+          <span class="drawer-current-price">${currencySymbol}${Math.round(product.current_price || 0).toLocaleString()}</span>
+        </div>
+        <div class="drawer-mrp-box">
+          <span class="drawer-mrp-label">MRP:</span>
+          <span class="drawer-mrp-val">${currencySymbol}${Math.round(product.mrp || 0).toLocaleString()}</span>
+          <span class="badge badge-emerald" style="font-weight: 700;">${discount}% OFF</span>
+        </div>
+      </div>
+      
+      <div class="drawer-deal-row">
+        ${savedAmt > 0 ? `<span style="font-size: 12px; font-weight: 600; color: var(--color-emerald);"><i class="fa-solid fa-piggy-bank"></i> Save ${currencySymbol}${savedAmt.toLocaleString()}</span>` : ""}
+        ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ALL-TIME LOW</span>` : ""}
+        ${hasPriceDrop ? `<span class="badge-drop"><i class="fa-solid fa-arrow-trend-down"></i> DROPPED -${stats.drop_pct}% (${currencySymbol}${Math.round(stats.drop_amount || 0).toLocaleString()} off)</span>` : ""}
+      </div>
+    </div>
+
+    <!-- 6-Month Benchmarks Grid -->
+    <div class="drawer-stats-grid">
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Lowest</div>
+        <div class="drawer-stat-val" style="color: var(--color-emerald);">${currencySymbol}${Math.round(stats.min_price || product.current_price).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Average</div>
+        <div class="drawer-stat-val" style="color: var(--color-indigo);">${currencySymbol}${Math.round(stats.avg_price || product.current_price).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Highest</div>
+        <div class="drawer-stat-val" style="color: var(--color-red);">${currencySymbol}${Math.round(stats.max_price || product.mrp).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">Excel Order</div>
+        <div class="drawer-stat-val">#${product.sort_order || '-'} of ${allProducts.length}</div>
+      </div>
+    </div>
+
+    <!-- Actions & Cross-Checking Toolbar -->
+    <div class="drawer-actions-stack">
+      <button class="drawer-btn-browser" onclick="openAmazonMiniBrowser('${product.url}')" title="Dock mini browser window alongside this dashboard for instant cross-checking">
+        <i class="fa-solid fa-table-columns"></i>
+        <span>Launch Mini Browser Side-by-Side</span>
+      </button>
+
+      <div class="drawer-action-split">
+        <a href="${product.url}" target="_blank" rel="noopener" class="drawer-btn-amazon" title="Open full Amazon product page in new tab">
+          <i class="fa-brands fa-amazon"></i>
+          <span>Open Amazon.in</span>
+          <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px; margin-left: auto;"></i>
+        </a>
+        <button class="btn btn-outline" style="font-size: 12px; font-weight: 600;" onclick="scrapeSingleAsin('${product.asin}')" title="Crawl live Amazon price right now">
+          <i class="fa-solid fa-rotate" style="color: var(--color-emerald);"></i>
+          <span>Re-Check Live</span>
+        </button>
+      </div>
+
+      <button class="btn btn-outline" style="font-size: 12px; font-weight: 600; width: 100%; justify-content: center; display: flex; gap: 6px; align-items: center;" onclick="closeSnapshotDrawer(); openProductDetailModal('${product.asin}')" title="View full 6-month price timeline chart">
+        <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
+        <span>View Full 6-Month Timeline Chart</span>
+      </button>
+    </div>
+  `;
+
+  if (overlay) overlay.classList.add("active");
+  if (drawer) {
+    drawer.classList.add("active");
+    drawer.setAttribute("aria-hidden", "false");
+  }
+}
+
+function closeSnapshotDrawer() {
+  const drawer = document.getElementById("snapshotDrawer");
+  const overlay = document.getElementById("snapshotDrawerOverlay");
+  if (drawer) {
+    drawer.classList.remove("active");
+    drawer.setAttribute("aria-hidden", "true");
+  }
+  if (overlay) overlay.classList.remove("active");
+}
+
+function launchDrawerMiniBrowser() {
+  if (currentDrawerProduct && currentDrawerProduct.url) {
+    openAmazonMiniBrowser(currentDrawerProduct.url);
+  }
+}
+
+function copyDrawerAsin() {
+  if (currentDrawerProduct && currentDrawerProduct.asin) {
+    copyAsin(currentDrawerProduct.asin);
+  }
+}
+
+/**
+ * Launch Genuine Amazon Mini Browser Side-by-Side Window
+ * Zero Server RAM & Zero Processing Cost
+ */
+function openAmazonMiniBrowser(url) {
+  if (!url) {
+    showToast("No product URL available.", "error");
+    return;
+  }
+  const screenW = window.screen.availWidth || 1440;
+  const screenH = window.screen.availHeight || 900;
+  const width = Math.min(680, Math.round(screenW * 0.45));
+  const height = Math.min(960, screenH - 60);
+  const left = Math.max(0, screenW - width - 15);
+  const top = 30;
+
+  const features = `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes`;
+  const win = window.open(url, "AmazonSideBySideMiniBrowser", features);
+
+  if (win) {
+    win.focus();
+    showToast("Opened Amazon Mini Browser side-by-side for live cross-check!", "info");
+  } else {
+    window.open(url, "_blank");
+    showToast("Popup blocked: Opened Amazon in new tab.", "amber");
+  }
 }
