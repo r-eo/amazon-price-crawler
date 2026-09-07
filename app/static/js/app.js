@@ -87,15 +87,15 @@ async function switchDashboard(group) {
     if (downloadText) downloadText.textContent = "Export Excel";
     if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=acer_monitors";
     if (scrapeText) scrapeText.textContent = "Scrape Monitors Tab";
-    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Acer Monitors & Stands Dashboard</strong>";
-    if (kpiScopeLabel) kpiScopeLabel.textContent = "Tracked Hardware";
-    if (chartTitle) chartTitle.textContent = "Acer Monitors & Stands — 6-Month Price Trajectory";
+    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Acer Monitors Dashboard (Catalog Pending)</strong>";
+    if (kpiScopeLabel) kpiScopeLabel.textContent = "Tracked Monitors";
+    if (chartTitle) chartTitle.textContent = "Acer Monitors — 6-Month Price Trajectory";
   } else if (group === "other_products") {
     if (downloadBtn) downloadBtn.href = "/api/export/excel?group=other_products";
     if (downloadText) downloadText.textContent = "Export Excel";
     if (downloadTableBtn) downloadTableBtn.href = "/api/export/excel?group=other_products";
     if (scrapeText) scrapeText.textContent = "Scrape Accessories Tab";
-    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Other Accessories Dashboard</strong>";
+    if (viewLabel) viewLabel.innerHTML = "Viewing: <strong>Other Accessories Dashboard (90 Products)</strong>";
     if (kpiScopeLabel) kpiScopeLabel.textContent = "Tracked Accessories";
     if (chartTitle) chartTitle.textContent = "Other Accessories — 6-Month Price Trajectory";
   } else {
@@ -162,9 +162,9 @@ function renderKpiCards(stats) {
   const kpiSubtextScope = document.getElementById("kpiSubtextScope");
   if (kpiSubtextScope) {
     if (currentGroup === "acer_monitors") {
-      kpiSubtextScope.textContent = "Monitor Stands & Privacy Screens";
+      kpiSubtextScope.textContent = "Catalog Pending Tomorrow";
     } else if (currentGroup === "other_products") {
-      kpiSubtextScope.textContent = "Mice, Keyboards, Audio & Bags";
+      kpiSubtextScope.textContent = "Complete Accessories Portfolio (Excel 1-90)";
     } else {
       kpiSubtextScope.textContent = "Unified 90-Item Portfolio";
     }
@@ -362,6 +362,7 @@ function renderProductsTable(products) {
             ${p.title}
           </a>
           <div class="product-sub-info">
+            ${p.part_no ? `<span class="product-part-no" style="font-family: var(--font-mono); font-weight: 600; color: var(--color-indigo);"><i class="fa-solid fa-barcode" style="font-size: 10px;"></i> ${p.part_no}</span> <span>&bull;</span>` : ''}
             <span class="product-rating"><i class="fa-solid fa-star"></i> ${p.rating || 4.2}</span>
             <span>&bull;</span>
             <span>${(p.review_count || 100).toLocaleString()} reviews</span>

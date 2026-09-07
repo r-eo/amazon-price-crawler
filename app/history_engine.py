@@ -142,17 +142,17 @@ def seed_database_if_empty(force: bool = False):
                     needs_sync = True
                     break
 
-    # Ensure authentic product image URLs, sort_orders, and product_groups are synchronized
+    # Ensure authentic product image URLs, sort_orders, product_groups, models, and part_nos are synchronized
     with get_db_connection() as conn:
         cursor = conn.cursor()
         for s in ACER_SEED_PRODUCTS:
             cursor.execute(
                 """
                 UPDATE products 
-                SET sort_order = ?, product_group = ?, image_url = COALESCE(?, image_url)
+                SET sort_order = ?, product_group = ?, model = ?, part_no = ?, image_url = COALESCE(?, image_url)
                 WHERE asin = ?
                 """,
-                (s["sort_order"], s["product_group"], s.get("image_url"), s["asin"])
+                (s["sort_order"], s["product_group"], s.get("model"), s.get("part_no"), s.get("image_url"), s["asin"])
             )
         conn.commit()
 
@@ -180,6 +180,8 @@ def seed_database_if_empty(force: bool = False):
         product_data = {
             "asin": asin,
             "title": item["title"],
+            "model": item.get("model"),
+            "part_no": item.get("part_no"),
             "category": item["category"],
             "product_group": grp,
             "sort_order": item.get("sort_order", 999),

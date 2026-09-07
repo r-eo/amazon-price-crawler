@@ -26,246 +26,248 @@ def build_excel_workbook(
 ) -> openpyxl.Workbook:
     """
     Generates a structured, executive-styled monotone Excel workbook containing:
-    1. Product_Overview: Specs, live prices, discounts, ATL/ATH metrics, clickable Amazon links.
+    1. Sheet1: Mirrors amazon acer accessories .xlsx structure with live pricing/intelligence.
     2. 6_Months_Price_History: Full monthly matrix across all 6 months with direct links and deal markers.
     3. Monthly_Statistics: Category-level and portfolio aggregate metrics over 6 months.
     """
     wb = openpyxl.Workbook()
     
-    # Executive Monotone Typography & Palette
-    FONT_FAMILY = "Segoe UI"
+    # Styling matching amazon acer accessories .xlsx
+    FONT_FAMILY = "Calibri"
     
-    title_font = Font(name=FONT_FAMILY, size=15, bold=True, color="FFFFFF")
-    subtitle_font = Font(name=FONT_FAMILY, size=9, italic=True, color="CBD5E1")
-    header_font = Font(name=FONT_FAMILY, size=10, bold=True, color="FFFFFF")
-    sub_header_font = Font(name=FONT_FAMILY, size=9, bold=True, color="FFFFFF")
-    data_font = Font(name=FONT_FAMILY, size=9, color="1E293B")
-    bold_data_font = Font(name=FONT_FAMILY, size=9, bold=True, color="0F172A")
-    link_font = Font(name=FONT_FAMILY, size=9, color="2563EB", underline="single")
-    link_bold_font = Font(name=FONT_FAMILY, size=9, bold=True, color="1E293B", underline="single")
-    badge_green_font = Font(name=FONT_FAMILY, size=9, bold=True, color="166534")
+    excel_green_fill = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid") # Excel Header Green (#92D050)
+    excel_header_font = Font(name=FONT_FAMILY, size=11, bold=True, color="000000")
     
-    # Monotone Enterprise Fills
-    title_fill = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid") # Obsidian Slate
-    header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid") # Dark Charcoal
-    sub_header_fill = PatternFill(start_color="334155", end_color="334155", fill_type="solid") # Slate
-    zebra_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") # Off-white silver
-    best_deal_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid") # Subdued Mint
-    out_of_stock_fill = PatternFill(start_color="FEF2F2", end_color="FEF2F2", fill_type="solid") # Subdued Rose
+    intel_header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid") # Slate Charcoal for Intel metrics
+    intel_header_font = Font(name=FONT_FAMILY, size=11, bold=True, color="FFFFFF")
     
-    thin_border_side = Side(style='thin', color='CBD5E1')
+    sub_header_fill = PatternFill(start_color="334155", end_color="334155", fill_type="solid")
+    sub_header_font = Font(name=FONT_FAMILY, size=10, bold=True, color="FFFFFF")
+    
+    data_font = Font(name=FONT_FAMILY, size=11, color="000000")
+    bold_data_font = Font(name=FONT_FAMILY, size=11, bold=True, color="000000")
+    link_font = Font(name=FONT_FAMILY, size=11, color="0000FF", underline="single")
+    
+    zebra_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+    best_deal_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+    out_of_stock_fill = PatternFill(start_color="FEF2F2", end_color="FEF2F2", fill_type="solid")
+    
+    thin_border_side = Side(style='thin', color='D4D4D8')
     border_all = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
     
     align_center = Alignment(horizontal="center", vertical="center")
     align_left = Alignment(horizontal="left", vertical="center")
     align_right = Alignment(horizontal="right", vertical="center")
-    align_wrap_left = Alignment(horizontal="left", vertical="center", wrap_text=True)
 
     month_labels = get_22_month_labels()
 
     # =========================================================================
-    # SHEET 1: Product_Overview
+    # SHEET 1: Sheet1 (Mirrors amazon acer accessories .xlsx format + Live Intelligence)
     # =========================================================================
     ws1 = wb.active
-    ws1.title = "Product_Overview"
+    ws1.title = "Sheet1"
     ws1.views.sheetView[0].showGridLines = True
 
-    # Title Banner
-    ws1.merge_cells("A1:M1")
-    title_cell = ws1["A1"]
-    title_cell.value = report_title.upper()
-    title_cell.font = title_font
-    title_cell.fill = title_fill
-    title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws1.row_dimensions[1].height = 36
-
-    ws1.merge_cells("A2:M2")
-    sub_cell = ws1["A2"]
-    sub_cell.value = f"Dashboard: {group_label} | Generated on: {now_ist().strftime('%d %B %Y, %I:%M %p IST')} | Active Tracked ASINs: {len(products)} | Currency: {CURRENCY_SYMBOL} (INR)"
-    sub_cell.font = subtitle_font
-    sub_cell.fill = title_fill
-    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws1.row_dimensions[2].height = 20
-
-    # Headers for Sheet 1
+    # Row 1: Headers matching exact original columns + Price intelligence
     headers1 = [
-        "ASIN", "Product Title", "Category", f"Today's Price ({CURRENCY_SYMBOL})",
-        f"MRP ({CURRENCY_SYMBOL})", "Discount %", "Stock Status",
-        f"6-Mo Lowest ({CURRENCY_SYMBOL})", f"6-Mo Highest ({CURRENCY_SYMBOL})",
-        f"6-Mo Avg ({CURRENCY_SYMBOL})", "% Off ATH", "Rating", "Amazon Link"
+        "ASIN", "Model", "Part No", "link",
+        f"Today's Price ({CURRENCY_SYMBOL})", f"MRP ({CURRENCY_SYMBOL})", "Discount %",
+        "Stock Status", f"6-Mo Lowest ({CURRENCY_SYMBOL})", f"6-Mo Highest ({CURRENCY_SYMBOL})",
+        f"6-Mo Avg ({CURRENCY_SYMBOL})", "% Off ATH", "Rating", "Category"
     ]
     
-    ws1.append([]) # Row 3 spacer
-    ws1.row_dimensions[3].height = 8
-    
-    ws1.append(headers1) # Row 4
-    ws1.row_dimensions[4].height = 26
+    ws1.append(headers1) # Row 1
+    ws1.row_dimensions[1].height = 26
     
     for col_idx, col_name in enumerate(headers1, 1):
-        c = ws1.cell(row=4, column=col_idx)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = align_center
+        c = ws1.cell(row=1, column=col_idx)
         c.border = border_all
+        c.alignment = align_center
+        if col_idx <= 4:
+            # Exact original columns: Green fill (#92D050) & Black Calibri 11 bold
+            c.font = excel_header_font
+            c.fill = excel_green_fill
+        else:
+            # Intelligence tracking columns: Slate fill & White Calibri 11 bold
+            c.font = intel_header_font
+            c.fill = intel_header_fill
 
-    # Data Rows for Sheet 1
-    for r_idx, prod in enumerate(products, start=5):
-        asin = prod["asin"]
-        stats = get_product_statistics(asin)
-        
-        is_zebra = (r_idx % 2 == 0)
-        row_fill = zebra_fill if is_zebra else None
-        
-        current_price = prod["current_price"]
-        mrp = prod["mrp"]
-        discount_pct = stats.get("discount_from_mrp", 0.0) / 100.0
-        stock = prod["stock_status"]
-        min_price = stats.get("min_price", current_price)
-        max_price = stats.get("max_price", current_price)
-        avg_price = stats.get("avg_price", current_price)
-        off_ath = stats.get("discount_from_ath", 0.0) / 100.0
-        rating = prod["rating"]
-        url = prod["url"]
+    # Row 2: Blank spacer row (matching amazon acer accessories .xlsx)
+    ws1.append([None] * len(headers1))
+    ws1.row_dimensions[2].height = 10
 
-        row_values = [
-            asin,
-            prod["title"],
-            prod["category"],
-            current_price,
-            mrp,
-            discount_pct,
-            stock,
-            min_price,
-            max_price,
-            avg_price,
-            off_ath,
-            rating,
-            "View on Amazon"
-        ]
-        ws1.append(row_values)
-        ws1.row_dimensions[r_idx].height = 22
+    # Data Rows for Sheet 1: Rows 3 to 92 (row-for-row match with Excel)
+    if not products:
+        ws1.merge_cells("A3:N3")
+        empty_cell = ws1["A3"]
+        empty_cell.value = "No products in this category yet. Real Acer Monitors catalog will be uploaded here."
+        empty_cell.font = Font(name=FONT_FAMILY, size=11, italic=True, color="64748B")
+        empty_cell.alignment = align_center
+        ws1.row_dimensions[3].height = 30
+    else:
+        for r_idx, prod in enumerate(products, start=3):
+            asin = prod["asin"]
+            stats = get_product_statistics(asin)
+            
+            is_zebra = (r_idx % 2 == 0)
+            row_fill = zebra_fill if is_zebra else None
+            
+            current_price = prod["current_price"]
+            mrp = prod["mrp"]
+            discount_pct = stats.get("discount_from_mrp", 0.0) / 100.0
+            stock = prod["stock_status"]
+            min_price = stats.get("min_price", current_price)
+            max_price = stats.get("max_price", current_price)
+            avg_price = stats.get("avg_price", current_price)
+            off_ath = stats.get("discount_from_ath", 0.0) / 100.0
+            rating = prod["rating"]
+            
+            model = prod.get("model") or prod.get("title")
+            part_no = prod.get("part_no") or ""
+            link_url = prod.get("amazon_link") or prod.get("url") or f"https://www.amazon.in/dp/{asin}"
 
-        # Style each cell in row
-        for col_idx in range(1, len(row_values) + 1):
-            cell = ws1.cell(row=r_idx, column=col_idx)
-            cell.font = data_font
-            cell.border = border_all
-            if row_fill:
-                cell.fill = row_fill
+            row_values = [
+                asin,
+                model,
+                part_no,
+                link_url,
+                current_price,
+                mrp,
+                discount_pct,
+                stock,
+                min_price,
+                max_price,
+                avg_price,
+                off_ath,
+                rating,
+                prod["category"]
+            ]
+            ws1.append(row_values)
+            ws1.row_dimensions[r_idx].height = 22
 
-            # Column specific formatters
-            if col_idx == 1: # ASIN
-                cell.value = asin
-                cell.hyperlink = url
-                cell.alignment = align_center
-                cell.font = link_bold_font
-            elif col_idx == 2: # Title
-                cell.alignment = align_wrap_left
-            elif col_idx == 3: # Category
-                cell.alignment = align_center
-            elif col_idx in (4, 5, 8, 9, 10): # Currency amounts
-                cell.number_format = f'{CURRENCY_SYMBOL}#,##0'
-                cell.alignment = align_right
-                if col_idx == 4 and stats.get("is_atl"):
-                    cell.fill = best_deal_fill
-                    cell.font = bold_data_font
-            elif col_idx in (6, 11): # Percentages
-                cell.number_format = '0.0%'
-                cell.alignment = align_right
-            elif col_idx == 7: # Stock
-                cell.alignment = align_center
-                if "out" in stock.lower():
-                    cell.fill = out_of_stock_fill
-            elif col_idx == 12: # Rating
-                cell.number_format = '0.0'
-                cell.alignment = align_center
-            elif col_idx == 13: # Link
-                cell.value = "Amazon ↗"
-                cell.hyperlink = url
-                cell.alignment = align_center
-                cell.font = link_font
+            # Style each cell in row
+            for col_idx in range(1, len(row_values) + 1):
+                cell = ws1.cell(row=r_idx, column=col_idx)
+                cell.font = data_font
+                cell.border = border_all
+                if row_fill:
+                    cell.fill = row_fill
+
+                if col_idx == 1: # ASIN
+                    cell.value = asin
+                    cell.hyperlink = link_url
+                    cell.alignment = align_center
+                elif col_idx == 2: # Model
+                    cell.alignment = align_left
+                elif col_idx == 3: # Part No
+                    cell.alignment = align_center
+                elif col_idx == 4: # link
+                    cell.value = link_url
+                    cell.hyperlink = link_url
+                    cell.alignment = align_left
+                    cell.font = link_font
+                elif col_idx in (5, 6, 9, 10, 11): # Currency amounts
+                    cell.number_format = f'{CURRENCY_SYMBOL}#,##0'
+                    cell.alignment = align_right
+                    if col_idx == 5 and stats.get("is_atl"):
+                        cell.fill = best_deal_fill
+                        cell.font = bold_data_font
+                elif col_idx in (7, 12): # Percentages
+                    cell.number_format = '0.0%'
+                    cell.alignment = align_right
+                elif col_idx == 8: # Stock Status
+                    cell.alignment = align_center
+                    if "out" in stock.lower():
+                        cell.fill = out_of_stock_fill
+                elif col_idx == 13: # Rating
+                    cell.number_format = '0.0'
+                    cell.alignment = align_center
+                elif col_idx == 14: # Category
+                    cell.alignment = align_center
 
     # =========================================================================
-    # SHEET 2: 6_Months_Price_History
+    # SHEET 2: 6_Months_Price_History (Row-for-row match with Excel)
     # =========================================================================
     ws2 = wb.create_sheet(title="6_Months_Price_History")
     ws2.views.sheetView[0].showGridLines = True
 
-    total_h_cols = 4 + len(month_labels) + 2
-    ws2.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_h_cols)
-    title_cell2 = ws2["A1"]
-    title_cell2.value = f"{report_title} — 6-MONTH HISTORICAL PRICE MATRIX"
-    title_cell2.font = title_font
-    title_cell2.fill = title_fill
-    title_cell2.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws2.row_dimensions[1].height = 36
-
-    ws2.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_h_cols)
-    sub_cell2 = ws2["A2"]
-    sub_cell2.value = f"Complete monthly trajectory from {month_labels[0]} to {month_labels[-1]} | Includes seasonal sales"
-    sub_cell2.font = subtitle_font
-    sub_cell2.fill = title_fill
-    sub_cell2.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws2.row_dimensions[2].height = 20
-
-    ws2.append([]) # Row 3 spacer
-    ws2.row_dimensions[3].height = 8
-
-    headers2 = ["ASIN", "Product Title", "Category", "Baseline MRP"] + month_labels + ["6-Mo Min", "6-Mo Max"]
+    headers2 = ["ASIN", "Model", "Part No", "Category", f"MRP ({CURRENCY_SYMBOL})"] + month_labels + [f"Period Low ({CURRENCY_SYMBOL})", f"Period High ({CURRENCY_SYMBOL})"]
     ws2.append(headers2)
-    ws2.row_dimensions[4].height = 26
+    ws2.row_dimensions[1].height = 26
 
     for col_idx, col_name in enumerate(headers2, 1):
-        c = ws2.cell(row=4, column=col_idx)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = align_center
+        c = ws2.cell(row=1, column=col_idx)
         c.border = border_all
+        c.alignment = align_center
+        if col_idx <= 3:
+            c.font = excel_header_font
+            c.fill = excel_green_fill
+        else:
+            c.font = intel_header_font
+            c.fill = intel_header_fill
 
-    for r_idx, prod in enumerate(products, start=5):
-        asin = prod["asin"]
-        history = get_price_history_for_asin(asin)
-        history_map = {h["month_label"]: h["price"] for h in history}
-        
-        prices_list = [history_map.get(m, prod["current_price"]) for m in month_labels]
-        min_p = min(prices_list) if prices_list else prod["current_price"]
-        max_p = max(prices_list) if prices_list else prod["current_price"]
-        
-        is_zebra = (r_idx % 2 == 0)
-        row_fill = zebra_fill if is_zebra else None
+    # Row 2: Blank spacer row
+    ws2.append([None] * len(headers2))
+    ws2.row_dimensions[2].height = 10
 
-        row_vals = [
-            asin,
-            prod["title"],
-            prod["category"],
-            prod["mrp"]
-        ] + prices_list + [min_p, max_p]
-        
-        ws2.append(row_vals)
-        ws2.row_dimensions[r_idx].height = 22
+    if not products:
+        ws2.merge_cells("A3:K3")
+        empty_cell = ws2["A3"]
+        empty_cell.value = "No historical data yet."
+        empty_cell.font = Font(name=FONT_FAMILY, size=11, italic=True, color="64748B")
+        empty_cell.alignment = align_center
+        ws2.row_dimensions[3].height = 30
+    else:
+        for r_idx, prod in enumerate(products, start=3):
+            asin = prod["asin"]
+            history = get_price_history_for_asin(asin)
+            history_map = {h["month_label"]: h["price"] for h in history}
+            
+            prices_list = [history_map.get(m, prod["current_price"]) for m in month_labels]
+            min_p = min(prices_list) if prices_list else prod["current_price"]
+            max_p = max(prices_list) if prices_list else prod["current_price"]
+            
+            is_zebra = (r_idx % 2 == 0)
+            row_fill = zebra_fill if is_zebra else None
 
-        for col_idx in range(1, len(row_vals) + 1):
-            cell = ws2.cell(row=r_idx, column=col_idx)
-            cell.font = data_font
-            cell.border = border_all
-            if row_fill:
-                cell.fill = row_fill
+            model = prod.get("model") or prod.get("title")
+            part_no = prod.get("part_no") or ""
+            link_url = prod.get("amazon_link") or prod.get("url") or f"https://www.amazon.in/dp/{asin}"
 
-            if col_idx == 1:
-                cell.value = asin
-                cell.hyperlink = prod["url"]
-                cell.alignment = align_center
-                cell.font = link_bold_font
-            elif col_idx == 2:
-                cell.alignment = align_wrap_left
-            elif col_idx == 3:
-                cell.alignment = align_center
-            elif col_idx >= 4:
-                cell.number_format = f'{CURRENCY_SYMBOL}#,##0'
-                cell.alignment = align_right
-                val = cell.value
-                if isinstance(val, (int, float)) and val == min_p:
-                    cell.fill = best_deal_fill # Highlight monthly lowest price in timeline
+            row_vals = [
+                asin,
+                model,
+                part_no,
+                prod["category"],
+                prod["mrp"]
+            ] + prices_list + [min_p, max_p]
+            
+            ws2.append(row_vals)
+            ws2.row_dimensions[r_idx].height = 22
+
+            for col_idx in range(1, len(row_vals) + 1):
+                cell = ws2.cell(row=r_idx, column=col_idx)
+                cell.font = data_font
+                cell.border = border_all
+                if row_fill:
+                    cell.fill = row_fill
+
+                if col_idx == 1:
+                    cell.value = asin
+                    cell.hyperlink = link_url
+                    cell.alignment = align_center
+                elif col_idx == 2:
+                    cell.alignment = align_left
+                elif col_idx == 3:
+                    cell.alignment = align_center
+                elif col_idx == 4:
+                    cell.alignment = align_center
+                elif col_idx >= 5:
+                    cell.number_format = f'{CURRENCY_SYMBOL}#,##0'
+                    cell.alignment = align_right
+                    val = cell.value
+                    if isinstance(val, (int, float)) and val == min_p:
+                        cell.fill = best_deal_fill
 
     # =========================================================================
     # SHEET 3: Monthly_Statistics
@@ -273,6 +275,9 @@ def build_excel_workbook(
     ws3 = wb.create_sheet(title="Monthly_Statistics")
     ws3.views.sheetView[0].showGridLines = True
 
+    title_fill = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+    title_font = Font(name=FONT_FAMILY, size=13, bold=True, color="FFFFFF")
+    
     total_s_cols = 2 + len(month_labels)
     ws3.merge_cells(start_row=1, start_column=1, end_row=1, end_column=total_s_cols)
     title_cell3 = ws3["A1"]
@@ -280,54 +285,44 @@ def build_excel_workbook(
     title_cell3.font = title_font
     title_cell3.fill = title_fill
     title_cell3.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws3.row_dimensions[1].height = 36
+    ws3.row_dimensions[1].height = 32
 
-    ws3.merge_cells(start_row=2, start_column=1, end_row=2, end_column=total_s_cols)
-    sub_cell3 = ws3["A2"]
-    sub_cell3.value = f"Average Category Price Trends across 6-Month Observation Period ({CURRENCY_SYMBOL} INR)"
-    sub_cell3.font = subtitle_font
-    sub_cell3.fill = title_fill
-    sub_cell3.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws3.row_dimensions[2].height = 20
+    ws3.append([])
+    ws3.row_dimensions[2].height = 8
 
-    ws3.append([]) # Row 3 spacer
-    ws3.row_dimensions[3].height = 8
-
-    headers3 = ["Category / Scope", "Metric"] + month_labels
+    headers3 = ["Category", "Product Count"] + month_labels
     ws3.append(headers3)
-    ws3.row_dimensions[4].height = 26
+    ws3.row_dimensions[3].height = 24
 
-    for col_idx, col_name in enumerate(headers3, 1):
-        c = ws3.cell(row=4, column=col_idx)
-        c.font = header_font
-        c.fill = header_fill
+    for col_idx in range(1, len(headers3) + 1):
+        c = ws3.cell(row=3, column=col_idx)
+        c.font = intel_header_font
+        c.fill = intel_header_fill
         c.alignment = align_center
         c.border = border_all
 
-    # Category monthly averages
-    categories = sorted(list(set(p["category"] for p in products))) if products else []
-    cat_prods = {cat: [p for p in products if p["category"] == cat] for cat in categories}
-    
-    current_r = 5
+    categories = sorted(list(set(p["category"] for p in products)))
+    current_r = 4
     for cat in categories:
-        prods_in_cat = cat_prods[cat]
-        cat_month_totals = {m: [] for m in month_labels}
+        cat_prods = [p for p in products if p["category"] == cat]
+        cat_asins = [p["asin"] for p in cat_prods]
         
-        for p in prods_in_cat:
-            h_list = get_price_history_for_asin(p["asin"])
+        cat_month_totals = {m: [] for m in month_labels}
+        for asin in cat_asins:
+            h_list = get_price_history_for_asin(asin)
             h_dict = {h["month_label"]: h["price"] for h in h_list}
             for m in month_labels:
                 if m in h_dict:
                     cat_month_totals[m].append(h_dict[m])
-
-        cat_avgs = [
+        
+        cat_month_avgs = [
             (sum(cat_month_totals[m]) / len(cat_month_totals[m])) if cat_month_totals[m] else 0.0
             for m in month_labels
         ]
-
-        row_vals = [cat, f"Avg Price ({len(prods_in_cat)} items)"] + cat_avgs
+        
+        row_vals = [cat, len(cat_prods)] + cat_month_avgs
         ws3.append(row_vals)
-        ws3.row_dimensions[current_r].height = 22
+        ws3.row_dimensions[current_r].height = 20
         
         for col_idx in range(1, len(row_vals) + 1):
             cell = ws3.cell(row=current_r, column=col_idx)
@@ -335,7 +330,6 @@ def build_excel_workbook(
             cell.border = border_all
             if col_idx == 1:
                 cell.alignment = align_left
-                cell.font = bold_data_font
             elif col_idx == 2:
                 cell.alignment = align_center
             else:
@@ -361,15 +355,14 @@ def build_excel_workbook(
         ws3.append([]) # spacer
         current_r += 1
         
-        row_vals = ["Overall Portfolio Benchmark", f"Weighted Average ({len(products)} items)"] + portfolio_avgs
+        row_vals = ["Overall Portfolio", len(products)] + portfolio_avgs
         ws3.append(row_vals)
         ws3.row_dimensions[current_r].height = 24
         
         for col_idx in range(1, len(row_vals) + 1):
             cell = ws3.cell(row=current_r, column=col_idx)
-            cell.font = bold_data_font
-            cell.fill = sub_header_fill
             cell.font = sub_header_font
+            cell.fill = sub_header_fill
             cell.border = border_all
             if col_idx == 1:
                 cell.alignment = align_left
@@ -379,28 +372,34 @@ def build_excel_workbook(
                 cell.number_format = f'{CURRENCY_SYMBOL}#,##0'
                 cell.alignment = align_right
 
-    # =========================================================================
-    # Auto-Fit Column Widths for all sheets
-    # =========================================================================
-    for sheet in [ws1, ws2, ws3]:
-        for col in sheet.columns:
-            max_len = 0
-            col_letter = get_column_letter(col[0].column)
-            for cell in col:
-                if cell.row in (1, 2):
-                    continue
-                if cell.value:
-                    val_str = str(cell.value)
-                    if len(val_str) > max_len:
-                        max_len = len(val_str)
-            
-            # Constrain min and max column widths
-            if col_letter == 'A':
-                sheet.column_dimensions[col_letter].width = 16
-            elif col_letter == 'B':
-                sheet.column_dimensions[col_letter].width = 48
-            else:
-                sheet.column_dimensions[col_letter].width = max(13, min(max_len + 3, 26))
+    # Set deliberate column widths
+    ws1.column_dimensions["A"].width = 14
+    ws1.column_dimensions["B"].width = 75
+    ws1.column_dimensions["C"].width = 16
+    ws1.column_dimensions["D"].width = 30
+    ws1.column_dimensions["E"].width = 16
+    ws1.column_dimensions["F"].width = 14
+    ws1.column_dimensions["G"].width = 14
+    ws1.column_dimensions["H"].width = 15
+    ws1.column_dimensions["I"].width = 16
+    ws1.column_dimensions["J"].width = 16
+    ws1.column_dimensions["K"].width = 16
+    ws1.column_dimensions["L"].width = 14
+    ws1.column_dimensions["M"].width = 10
+    ws1.column_dimensions["N"].width = 24
+
+    ws2.column_dimensions["A"].width = 14
+    ws2.column_dimensions["B"].width = 75
+    ws2.column_dimensions["C"].width = 16
+    ws2.column_dimensions["D"].width = 24
+    ws2.column_dimensions["E"].width = 15
+    for m_col in ["F", "G", "H", "I", "J", "K", "L", "M"]:
+        ws2.column_dimensions[m_col].width = 15
+
+    ws3.column_dimensions["A"].width = 28
+    ws3.column_dimensions["B"].width = 18
+    for m_col in ["C", "D", "E", "F", "G", "H", "I", "J"]:
+        ws3.column_dimensions[m_col].width = 15
 
     return wb
 

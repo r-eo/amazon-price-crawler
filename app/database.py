@@ -38,13 +38,17 @@ def init_db():
             )
         """)
         
-        # Migration: Ensure product_group and sort_order columns exist
+        # Migration: Ensure product_group, sort_order, part_no, and model columns exist
         cursor.execute("PRAGMA table_info(products)")
         columns = [row["name"] for row in cursor.fetchall()]
         if "product_group" not in columns:
             cursor.execute("ALTER TABLE products ADD COLUMN product_group TEXT DEFAULT 'other_products'")
         if "sort_order" not in columns:
             cursor.execute("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 999")
+        if "part_no" not in columns:
+            cursor.execute("ALTER TABLE products ADD COLUMN part_no TEXT")
+        if "model" not in columns:
+            cursor.execute("ALTER TABLE products ADD COLUMN model TEXT")
 
         # Move monitor stands and privacy screens to other_products (accessories)
         cursor.execute("""
@@ -125,17 +129,24 @@ def upsert_product(product_data: Dict[str, Any]):
     if "sort_order" not in product_data or product_data["sort_order"] is None:
         product_data["sort_order"] = 999
 
+    if "part_no" not in product_data:
+        product_data["part_no"] = None
+    if "model" not in product_data:
+        product_data["model"] = None
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO products (
-                asin, title, category, product_group, sort_order, mrp, current_price, currency,
+                asin, title, model, part_no, category, product_group, sort_order, mrp, current_price, currency,
                 stock_status, rating, review_count, image_url, url, last_scraped_at
             ) VALUES (
-                :asin, :title, :category, :product_group, :sort_order, :mrp, :current_price, :currency,
+                :asin, :title, :model, :part_no, :category, :product_group, :sort_order, :mrp, :current_price, :currency,
                 :stock_status, :rating, :review_count, :image_url, :url, :last_scraped_at
             ) ON CONFLICT(asin) DO UPDATE SET
                 title = excluded.title,
+                model = COALESCE(excluded.model, products.model),
+                part_no = COALESCE(excluded.part_no, products.part_no),
                 category = excluded.category,
                 product_group = excluded.product_group,
                 sort_order = CASE WHEN excluded.sort_order < 999 THEN excluded.sort_order ELSE products.sort_order END,
