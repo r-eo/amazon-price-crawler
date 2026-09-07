@@ -252,7 +252,7 @@
       </section>
 
       <!-- Products Data Grid Section -->
-      <section class="data-table-section">
+      <section class="data-table-section" id="dataTableSection">
         <div class="table-card">
           <div class="table-toolbar">
             <div class="toolbar-left">
@@ -277,6 +277,10 @@
             </div>
 
             <div class="toolbar-right">
+              <button id="btnToggleSideBySide" class="btn btn-sm btn-outline" onclick="toggleSideBySideView()" title="Toggle Side-by-Side Split View">
+                <i class="fa-solid fa-table-columns" style="color: var(--color-indigo);"></i>
+                <span>Side-by-Side View</span>
+              </button>
               <span class="table-count" id="tableResultCount">Showing 0 products</span>
               <a href="/api/export/excel?group=other_products" id="btnDownloadExcelTable" class="btn btn-sm btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
                 <i class="fa-solid fa-file-excel"></i>
@@ -308,6 +312,20 @@
                 <!-- Dynamically Rendered Rows -->
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- Integrated Side-by-Side Live Inspection Pane -->
+        <div class="side-inspection-panel" id="sideInspectionPanel" style="display: none;">
+          <div class="inspection-header">
+            <div class="inspection-header-title">
+              <span class="badge badge-indigo" id="inspectCategory">Accessories</span>
+              <span class="asin-code" id="inspectAsin" title="Click to copy ASIN" onclick="copyInspectAsin()">--</span>
+            </div>
+            <button class="btn-close-inspect" onclick="closeSideBySideView()" title="Close Side-by-Side View">&times;</button>
+          </div>
+          <div class="inspection-body" id="inspectBody">
+            <!-- Dynamically populated via renderInspectionBody() -->
           </div>
         </div>
       </section>

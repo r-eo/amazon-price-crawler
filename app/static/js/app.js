@@ -333,6 +333,15 @@ function renderProductsTable(products) {
   products.forEach((p) => {
     const stats = p.stats || {};
     const tr = document.createElement("tr");
+    tr.id = `row-${p.asin}`;
+    if (sideBySideActive && selectedInspectAsin === p.asin) {
+      tr.classList.add("row-selected");
+    }
+    tr.onclick = (e) => {
+      if (!e.target.closest("button") && !e.target.closest("a")) {
+        selectProductForInspection(p.asin);
+      }
+    };
 
     const isAtl = stats.is_atl;
     const discount = stats.discount_from_mrp || 0;
@@ -345,18 +354,18 @@ function renderProductsTable(products) {
 
     tr.innerHTML = `
       <td>
-        <div class="product-thumb-container" onclick="openSnapshotDrawer('${p.asin}')" title="Click to view Instant Snapshot" style="cursor: pointer;">
+        <div class="product-thumb-container" onclick="event.stopPropagation(); selectProductForInspection('${p.asin}')" title="Click to inspect side-by-side" style="cursor: pointer;">
           ${imgTag}
         </div>
       </td>
       <td>
-        <span class="asin-code" title="Click to copy ASIN" onclick="copyAsin('${p.asin}')">
+        <span class="asin-code" title="Click to copy ASIN" onclick="event.stopPropagation(); copyAsin('${p.asin}')">
           ${p.asin}
         </span>
       </td>
       <td>
         <div class="product-meta-cell">
-          <a href="${p.url}" target="_blank" rel="noopener" class="product-title-link" title="${p.title}">
+          <a href="${p.url}" target="_blank" rel="noopener" class="product-title-link" title="${p.title}" onclick="event.stopPropagation();">
             ${p.title}
           </a>
           <div class="product-sub-info">
@@ -365,7 +374,7 @@ function renderProductsTable(products) {
             <span>&bull;</span>
             <span>${(p.review_count || 100).toLocaleString()} reviews</span>
             <span>&bull;</span>
-            <a href="${p.url}" target="_blank" rel="noopener" style="color: var(--color-cyan); text-decoration: none;">
+            <a href="${p.url}" target="_blank" rel="noopener" style="color: var(--color-cyan); text-decoration: none;" onclick="event.stopPropagation();">
               Amazon <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 9px;"></i>
             </a>
           </div>
@@ -399,19 +408,22 @@ function renderProductsTable(products) {
       </td>
       <td class="text-center">
         <div class="action-buttons">
-          <button class="btn btn-icon btn-outline" onclick="openSnapshotDrawer('${p.asin}')" title="Instant Amazon Snapshot Drawer (Quick Details & Pricing)">
+          <button class="btn btn-icon btn-outline" onclick="event.stopPropagation(); selectProductForInspection('${p.asin}')" title="Inspect in Side-by-Side Pane">
+            <i class="fa-solid fa-table-columns" style="color: var(--color-indigo);"></i>
+          </button>
+          <button class="btn btn-icon btn-outline" onclick="event.stopPropagation(); openSnapshotDrawer('${p.asin}')" title="Open Full Snapshot Drawer">
             <i class="fa-solid fa-eye" style="color: var(--color-cyan);"></i>
           </button>
-          <button class="btn btn-icon btn-outline" onclick="openAmazonMiniBrowser('${p.url}')" title="Open Amazon Side-by-Side Mini Browser (Live Cross-Check)">
-            <i class="fa-solid fa-table-columns" style="color: #ea580c;"></i>
-          </button>
-          <button class="btn btn-icon btn-outline" onclick="openProductDetailModal('${p.asin}')" title="View 6-Month Price Timeline">
+          <a href="${p.url}" target="_blank" rel="noopener" class="btn btn-icon btn-outline" onclick="event.stopPropagation();" title="Open Live on Amazon.in (New Tab)">
+            <i class="fa-brands fa-amazon" style="color: #ea580c;"></i>
+          </a>
+          <button class="btn btn-icon btn-outline" onclick="event.stopPropagation(); openProductDetailModal('${p.asin}')" title="View 6-Month Price Timeline">
             <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
           </button>
-          <button class="btn btn-icon btn-outline" onclick="scrapeSingleAsin('${p.asin}')" title="Live Crawl Amazon Price">
+          <button class="btn btn-icon btn-outline" onclick="event.stopPropagation(); scrapeSingleAsin('${p.asin}')" title="Live Crawl Amazon Price">
             <i class="fa-solid fa-rotate" style="color: var(--color-emerald);"></i>
           </button>
-          <button class="btn btn-icon btn-outline" onclick="confirmDeleteAsin('${p.asin}')" title="Delete ASIN" style="color: var(--color-red);">
+          <button class="btn btn-icon btn-outline" onclick="event.stopPropagation(); confirmDeleteAsin('${p.asin}')" title="Delete ASIN" style="color: var(--color-red);">
             <i class="fa-solid fa-trash"></i>
           </button>
         </div>
@@ -661,6 +673,9 @@ async function scrapeSingleAsin(asin) {
           applyFiltersAndRenderTable();
           if (currentDrawerProduct && currentDrawerProduct.asin === asin) {
             openSnapshotDrawer(asin);
+          }
+          if (sideBySideActive && selectedInspectAsin === asin) {
+            renderInspectionBody(allProducts[idx]);
           }
         }
       }
@@ -920,10 +935,196 @@ function showToast(message, type = "info") {
 
 /**
  * =========================================================================
- * Instant Snapshot Drawer & Mini Browser Side-by-Side Controller
+ * Integrated Side-by-Side Split View & Instant Snapshot Controller
  * =========================================================================
  */
 let currentDrawerProduct = null;
+let sideBySideActive = false;
+let selectedInspectAsin = null;
+
+function toggleSideBySideView() {
+  sideBySideActive = !sideBySideActive;
+  const section = document.getElementById("dataTableSection");
+  const panel = document.getElementById("sideInspectionPanel");
+  const toggleBtn = document.getElementById("btnToggleSideBySide");
+
+  if (section) section.classList.toggle("split-active", sideBySideActive);
+  if (panel) panel.style.display = sideBySideActive ? "flex" : "none";
+  if (toggleBtn) toggleBtn.classList.toggle("active", sideBySideActive);
+
+  if (sideBySideActive) {
+    if (!selectedInspectAsin && filteredProducts.length > 0) {
+      selectProductForInspection(filteredProducts[0].asin);
+    } else if (selectedInspectAsin) {
+      selectProductForInspection(selectedInspectAsin);
+    }
+    showToast("Side-by-Side View active! Click any product row to inspect.", "info");
+  } else {
+    document.querySelectorAll("#productsTableBody tr").forEach((tr) => {
+      tr.classList.remove("row-selected");
+    });
+    showToast("Returned to full-width table view.", "info");
+  }
+}
+
+function selectProductForInspection(asin) {
+  selectedInspectAsin = asin;
+  const product = allProducts.find((p) => p.asin === asin);
+  if (!product) return;
+
+  // Highlight selected row in table
+  document.querySelectorAll("#productsTableBody tr").forEach((tr) => {
+    tr.classList.remove("row-selected");
+  });
+  const rowEl = document.getElementById(`row-${asin}`);
+  if (rowEl) rowEl.classList.add("row-selected");
+
+  // Ensure side-by-side mode is active
+  if (!sideBySideActive) {
+    sideBySideActive = true;
+    const section = document.getElementById("dataTableSection");
+    const panel = document.getElementById("sideInspectionPanel");
+    const toggleBtn = document.getElementById("btnToggleSideBySide");
+    if (section) section.classList.add("split-active");
+    if (panel) panel.style.display = "flex";
+    if (toggleBtn) toggleBtn.classList.add("active");
+  }
+
+  renderInspectionBody(product);
+}
+
+function closeSideBySideView() {
+  sideBySideActive = false;
+  const section = document.getElementById("dataTableSection");
+  const panel = document.getElementById("sideInspectionPanel");
+  const toggleBtn = document.getElementById("btnToggleSideBySide");
+  if (section) section.classList.remove("split-active");
+  if (panel) panel.style.display = "none";
+  if (toggleBtn) toggleBtn.classList.remove("active");
+  document.querySelectorAll("#productsTableBody tr").forEach((tr) => {
+    tr.classList.remove("row-selected");
+  });
+}
+
+function copyInspectAsin() {
+  if (selectedInspectAsin) {
+    copyAsin(selectedInspectAsin);
+  }
+}
+
+function renderInspectionBody(product) {
+  const panel = document.getElementById("sideInspectionPanel");
+  const inspectBody = document.getElementById("inspectBody");
+  const inspectCat = document.getElementById("inspectCategory");
+  const inspectAsin = document.getElementById("inspectAsin");
+
+  if (inspectCat) inspectCat.textContent = product.category || "Accessories";
+  if (inspectAsin) inspectAsin.textContent = product.asin;
+  if (!inspectBody) return;
+
+  const stats = product.stats || {};
+  const isAtl = stats.is_atl;
+  const hasPriceDrop = !!stats.has_price_drop;
+  const inStock = (product.stock_status || "").toLowerCase().includes("in stock");
+  const discount = stats.discount_from_mrp || 0;
+  const savedAmt = (product.mrp && product.current_price && product.mrp > product.current_price) 
+    ? Math.round(product.mrp - product.current_price) 
+    : 0;
+
+  let highResImg = product.image_url;
+  if (highResImg && highResImg.includes("._")) {
+    highResImg = highResImg.replace(/\._[A-Z0-9_]+_\./, "._SL1000_.");
+  }
+  if (!highResImg) {
+    highResImg = "https://placehold.co/360x360/1E293B/94A3B8?text=Acer";
+  }
+
+  inspectBody.innerHTML = `
+    <!-- Product Visual Card -->
+    <div class="drawer-image-box" style="height: 200px;">
+      <img src="${highResImg}" alt="${product.title}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='${product.image_url || 'https://placehold.co/360x360/1E293B/94A3B8?text=Acer'}'">
+      <a href="${highResImg}" target="_blank" rel="noopener" class="drawer-image-badge" title="Open full resolution image in new tab">
+        <i class="fa-solid fa-magnifying-glass-plus"></i> Zoom
+      </a>
+    </div>
+
+    <!-- Product Title & Metadata -->
+    <div class="drawer-title-section">
+      <div class="drawer-meta-pills">
+        ${product.part_no ? `<span class="badge badge-indigo" style="font-family: var(--font-mono); font-size: 11px;"><i class="fa-solid fa-barcode"></i> ${product.part_no}</span>` : ""}
+        <span class="badge ${inStock ? 'badge-emerald' : 'badge-red'}">
+          <i class="fa-solid ${inStock ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+          ${inStock ? 'In Stock on Amazon' : 'Currently Unavailable'}
+        </span>
+        <span class="product-rating" style="font-size: 12px; font-weight: 600;">
+          <i class="fa-solid fa-star"></i> ${product.rating || 4.2} <span style="color: var(--text-muted); font-weight: normal;">(${(product.review_count || 100).toLocaleString()})</span>
+        </span>
+      </div>
+      <h3 class="drawer-product-title" style="font-size: 14px;">${product.title}</h3>
+    </div>
+
+    <!-- Pricing Intelligence Card -->
+    <div class="drawer-price-card">
+      <div class="drawer-price-row">
+        <div>
+          <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); display: block;">Live Amazon Price</span>
+          <span class="drawer-current-price" style="font-size: 22px;">${currencySymbol}${Math.round(product.current_price || 0).toLocaleString()}</span>
+        </div>
+        <div class="drawer-mrp-box">
+          <span class="drawer-mrp-label">MRP:</span>
+          <span class="drawer-mrp-val">${currencySymbol}${Math.round(product.mrp || 0).toLocaleString()}</span>
+          <span class="badge badge-emerald" style="font-weight: 700;">${discount}% OFF</span>
+        </div>
+      </div>
+      
+      <div class="drawer-deal-row">
+        ${savedAmt > 0 ? `<span style="font-size: 11px; font-weight: 600; color: var(--color-emerald);"><i class="fa-solid fa-piggy-bank"></i> Save ${currencySymbol}${savedAmt.toLocaleString()}</span>` : ""}
+        ${isAtl ? `<span class="badge-atl"><i class="fa-solid fa-star"></i> ALL-TIME LOW</span>` : ""}
+        ${hasPriceDrop ? `<span class="badge-drop"><i class="fa-solid fa-arrow-trend-down"></i> DROPPED -${stats.drop_pct}% (${currencySymbol}${Math.round(stats.drop_amount || 0).toLocaleString()} off)</span>` : ""}
+      </div>
+    </div>
+
+    <!-- 6-Month Benchmarks Grid -->
+    <div class="drawer-stats-grid">
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Lowest</div>
+        <div class="drawer-stat-val" style="color: var(--color-emerald); font-size: 13px;">${currencySymbol}${Math.round(stats.min_price || product.current_price).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Average</div>
+        <div class="drawer-stat-val" style="color: var(--color-indigo); font-size: 13px;">${currencySymbol}${Math.round(stats.avg_price || product.current_price).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">6-Month Highest</div>
+        <div class="drawer-stat-val" style="color: var(--color-red); font-size: 13px;">${currencySymbol}${Math.round(stats.max_price || product.mrp).toLocaleString()}</div>
+      </div>
+      <div class="drawer-stat-item">
+        <div class="drawer-stat-label">Excel Order</div>
+        <div class="drawer-stat-val" style="font-size: 13px;">#${product.sort_order || '-'} of ${allProducts.length}</div>
+      </div>
+    </div>
+
+    <!-- Actions & Cross-Checking Toolbar -->
+    <div class="drawer-actions-stack">
+      <a href="${product.url}" target="_blank" rel="noopener" class="drawer-btn-amazon" style="font-size: 13px; padding: 10px 14px; text-decoration: none;" title="Open genuine Amazon product page in new tab">
+        <i class="fa-brands fa-amazon" style="font-size: 16px; color: #fbbf24;"></i>
+        <strong style="color: #ffffff;">Open Live on Amazon.in</strong>
+        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px; margin-left: auto;"></i>
+      </a>
+
+      <div class="drawer-action-split">
+        <button class="btn btn-outline" style="font-size: 12px; font-weight: 600;" onclick="scrapeSingleAsin('${product.asin}')" title="Crawl live Amazon price right now">
+          <i class="fa-solid fa-rotate" style="color: var(--color-emerald);"></i>
+          <span>Re-Check Live</span>
+        </button>
+        <button class="btn btn-outline" style="font-size: 12px; font-weight: 600;" onclick="openProductDetailModal('${product.asin}')" title="View full 6-month price timeline chart">
+          <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
+          <span>6-Mo Timeline</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
 
 function openSnapshotDrawer(asin) {
   const product = allProducts.find((p) => p.asin === asin);
@@ -951,7 +1152,6 @@ function openSnapshotDrawer(asin) {
     ? Math.round(product.mrp - product.current_price) 
     : 0;
 
-  // Optimize image URL for high resolution preview
   let highResImg = product.image_url;
   if (highResImg && highResImg.includes("._")) {
     highResImg = highResImg.replace(/\._[A-Z0-9_]+_\./, "._SL1000_.");
@@ -1027,27 +1227,27 @@ function openSnapshotDrawer(asin) {
 
     <!-- Actions & Cross-Checking Toolbar -->
     <div class="drawer-actions-stack">
-      <button class="drawer-btn-browser" onclick="openAmazonMiniBrowser('${product.url}')" title="Dock mini browser window alongside this dashboard for instant cross-checking">
+      <a href="${product.url}" target="_blank" rel="noopener" class="drawer-btn-amazon" style="font-size: 13px; padding: 10px 14px; text-decoration: none;" title="Open genuine Amazon product page in new tab">
+        <i class="fa-brands fa-amazon" style="font-size: 16px; color: #fbbf24;"></i>
+        <strong style="color: #ffffff;">Open Live on Amazon.in</strong>
+        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 11px; margin-left: auto;"></i>
+      </a>
+
+      <button class="drawer-btn-browser" onclick="closeSnapshotDrawer(); selectProductForInspection('${product.asin}')" title="Pin to Side-by-Side Split View alongside table">
         <i class="fa-solid fa-table-columns"></i>
-        <span>Launch Mini Browser Side-by-Side</span>
+        <span>Pin to Side-by-Side View</span>
       </button>
 
       <div class="drawer-action-split">
-        <a href="${product.url}" target="_blank" rel="noopener" class="drawer-btn-amazon" title="Open full Amazon product page in new tab">
-          <i class="fa-brands fa-amazon"></i>
-          <span>Open Amazon.in</span>
-          <i class="fa-solid fa-arrow-up-right-from-square" style="font-size: 10px; margin-left: auto;"></i>
-        </a>
         <button class="btn btn-outline" style="font-size: 12px; font-weight: 600;" onclick="scrapeSingleAsin('${product.asin}')" title="Crawl live Amazon price right now">
           <i class="fa-solid fa-rotate" style="color: var(--color-emerald);"></i>
           <span>Re-Check Live</span>
         </button>
+        <button class="btn btn-outline" style="font-size: 12px; font-weight: 600;" onclick="closeSnapshotDrawer(); openProductDetailModal('${product.asin}')" title="View full 6-month price timeline chart">
+          <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
+          <span>6-Mo Timeline</span>
+        </button>
       </div>
-
-      <button class="btn btn-outline" style="font-size: 12px; font-weight: 600; width: 100%; justify-content: center; display: flex; gap: 6px; align-items: center;" onclick="closeSnapshotDrawer(); openProductDetailModal('${product.asin}')" title="View full 6-month price timeline chart">
-        <i class="fa-solid fa-chart-line" style="color: var(--color-indigo);"></i>
-        <span>View Full 6-Month Timeline Chart</span>
-      </button>
     </div>
   `;
 
@@ -1070,40 +1270,12 @@ function closeSnapshotDrawer() {
 
 function launchDrawerMiniBrowser() {
   if (currentDrawerProduct && currentDrawerProduct.url) {
-    openAmazonMiniBrowser(currentDrawerProduct.url);
+    window.open(currentDrawerProduct.url, "_blank");
   }
 }
 
 function copyDrawerAsin() {
   if (currentDrawerProduct && currentDrawerProduct.asin) {
     copyAsin(currentDrawerProduct.asin);
-  }
-}
-
-/**
- * Launch Genuine Amazon Mini Browser Side-by-Side Window
- * Zero Server RAM & Zero Processing Cost
- */
-function openAmazonMiniBrowser(url) {
-  if (!url) {
-    showToast("No product URL available.", "error");
-    return;
-  }
-  const screenW = window.screen.availWidth || 1440;
-  const screenH = window.screen.availHeight || 900;
-  const width = Math.min(680, Math.round(screenW * 0.45));
-  const height = Math.min(960, screenH - 60);
-  const left = Math.max(0, screenW - width - 15);
-  const top = 30;
-
-  const features = `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=yes,status=no,resizable=yes,scrollbars=yes`;
-  const win = window.open(url, "AmazonSideBySideMiniBrowser", features);
-
-  if (win) {
-    win.focus();
-    showToast("Opened Amazon Mini Browser side-by-side for live cross-check!", "info");
-  } else {
-    window.open(url, "_blank");
-    showToast("Popup blocked: Opened Amazon in new tab.", "amber");
   }
 }
