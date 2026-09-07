@@ -897,10 +897,10 @@ async function checkSchedulerStatus() {
     const ind = document.getElementById("schedulerStatusIndicator");
     if (el && data.time_remaining) {
       const nextDisplay = data.next_time_display || "9:00 AM IST";
-      el.textContent = `Sync: ${nextDisplay} (${data.time_remaining})`;
+      el.innerHTML = `<span class="sync-title">Sync: ${nextDisplay}</span> <span class="sync-remaining">(${data.time_remaining})</span>`;
     }
     if (ind && data.intervals) {
-      ind.title = `Automated sync runs every 2 hours in IST (9 AM to 9 PM). Next: ${data.next_run_at || ''}`;
+      ind.title = `Automated sync runs every 2 hours in IST (9 AM to 9 PM). Next: ${data.next_run_at || ''} (${data.time_remaining || ''})`;
     }
   } catch (e) {
     // Silent fallback

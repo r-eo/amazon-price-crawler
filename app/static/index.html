@@ -22,7 +22,7 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 
   <!-- Modern Slate & Cyber Gradient CSS -->
-  <link rel="stylesheet" href="/css/style.css?v=4.0.5">
+  <link rel="stylesheet" href="/css/style.css?v=4.0.6">
 </head>
 <body>
   <div class="app-layout">
@@ -39,7 +39,7 @@
               <h1>ACER <span>INTELLIGENCE</span></h1>
               <span class="env-badge">ENTERPRISE v3.0</span>
             </div>
-            <p class="brand-desc">Amazon Dual Dashboard &bull; Hourly Sync (Starting 9 AM) &bull; 6-Month History</p>
+            <p class="brand-desc">Amazon Dual Dashboard &bull; Hourly Sync &bull; 6-Mo History</p>
           </div>
         </div>
 
@@ -68,7 +68,7 @@
           <!-- Live 2-Hour Scheduler Status (IST) -->
           <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every 2 hours in IST (9 AM to 9 PM)">
             <span class="status-dot"></span>
-            <span id="schedulerStatusText">Sync Every 2 Hours (IST)</span>
+            <span id="schedulerStatusText"><span class="sync-title">Sync: 9:00 AM IST</span></span>
           </div>
 
           <!-- Notification Bell with Unread Badge & Dropdown -->
@@ -116,7 +116,7 @@
             <!-- Download Dedicated Group Excel Report -->
             <a href="/api/export/excel?group=other_products" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
               <i class="fa-solid fa-file-excel"></i>
-              <span id="downloadBtnText">Export Excel</span>
+              <span id="downloadBtnText">Export</span>
             </a>
 
             <!-- Check Prices Now (Instant Daily Scan) -->
@@ -425,6 +425,6 @@
 
   <!-- Javascript Modules -->
   <script src="/js/charts.js?v=4.1.0"></script>
-  <script src="/js/app.js?v=4.1.0"></script>
+  <script src="/js/app.js?v=4.1.1"></script>
 </body>
 </html>
