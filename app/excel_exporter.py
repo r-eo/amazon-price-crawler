@@ -1,5 +1,6 @@
 import io
 import os
+import gc
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import openpyxl
@@ -9,7 +10,8 @@ from openpyxl.utils import get_column_letter
 from app.config import (
     EXPORTS_DIR, CURRENCY_SYMBOL,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
-    EXCEL_MONITORS_FILENAME, EXCEL_OTHER_FILENAME, EXCEL_ALL_FILENAME
+    EXCEL_MONITORS_FILENAME, EXCEL_OTHER_FILENAME, EXCEL_ALL_FILENAME,
+    now_ist, now_ist_str
 )
 from app.database import (
     get_all_products, get_products_by_group,
@@ -79,7 +81,7 @@ def build_excel_workbook(
 
     ws1.merge_cells("A2:M2")
     sub_cell = ws1["A2"]
-    sub_cell.value = f"Dashboard: {group_label} | Generated on: {datetime.now().strftime('%d %B %Y, %I:%M %p')} | Active Tracked ASINs: {len(products)} | Currency: {CURRENCY_SYMBOL} (INR)"
+    sub_cell.value = f"Dashboard: {group_label} | Generated on: {now_ist().strftime('%d %B %Y, %I:%M %p IST')} | Active Tracked ASINs: {len(products)} | Currency: {CURRENCY_SYMBOL} (INR)"
     sub_cell.font = subtitle_font
     sub_cell.fill = title_fill
     sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -89,8 +91,8 @@ def build_excel_workbook(
     headers1 = [
         "ASIN", "Product Title", "Category", f"Today's Price ({CURRENCY_SYMBOL})",
         f"MRP ({CURRENCY_SYMBOL})", "Discount %", "Stock Status",
-        f"22-Mo Lowest ({CURRENCY_SYMBOL})", f"22-Mo Highest ({CURRENCY_SYMBOL})",
-        f"22-Mo Avg ({CURRENCY_SYMBOL})", "% Off ATH", "Rating", "Amazon Link"
+        f"6-Mo Lowest ({CURRENCY_SYMBOL})", f"6-Mo Highest ({CURRENCY_SYMBOL})",
+        f"6-Mo Avg ({CURRENCY_SYMBOL})", "% Off ATH", "Rating", "Amazon Link"
     ]
     
     ws1.append([]) # Row 3 spacer
@@ -413,6 +415,9 @@ def export_monitors_excel(target_path: Optional[str] = None) -> str:
     if not target_path:
         target_path = str(EXPORTS_DIR / EXCEL_MONITORS_FILENAME)
     wb.save(target_path)
+    wb.close()
+    del wb
+    gc.collect()
     return target_path
 
 def export_other_products_excel(target_path: Optional[str] = None) -> str:
@@ -426,6 +431,9 @@ def export_other_products_excel(target_path: Optional[str] = None) -> str:
     if not target_path:
         target_path = str(EXPORTS_DIR / EXCEL_OTHER_FILENAME)
     wb.save(target_path)
+    wb.close()
+    del wb
+    gc.collect()
     return target_path
 
 def export_all_portfolio_excel(target_path: Optional[str] = None) -> str:
@@ -439,6 +447,9 @@ def export_all_portfolio_excel(target_path: Optional[str] = None) -> str:
     if not target_path:
         target_path = str(EXPORTS_DIR / EXCEL_ALL_FILENAME)
     wb.save(target_path)
+    wb.close()
+    del wb
+    gc.collect()
     return target_path
 
 def export_excel_by_group(group: str, target_path: Optional[str] = None) -> str:
@@ -473,5 +484,8 @@ def export_excel_to_bytes(group: str = GROUP_ALL) -> io.BytesIO:
     wb = build_excel_workbook(products, title, label)
     stream = io.BytesIO()
     wb.save(stream)
+    wb.close()
+    del wb
+    gc.collect()
     stream.seek(0)
     return stream

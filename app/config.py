@@ -1,5 +1,17 @@
 import os
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
+
+# Indian Standard Time (IST) definitions
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def now_ist() -> datetime:
+    """Returns current datetime in Indian Standard Time (IST, UTC+5:30)."""
+    return datetime.now(timezone.utc).astimezone(IST)
+
+def now_ist_str(fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Returns formatted string of current IST datetime."""
+    return now_ist().strftime(fmt)
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -64,7 +76,11 @@ EXCEL_MONITORS_FILENAME = "Acer_Monitors_Price_Tracker.xlsx"
 EXCEL_OTHER_FILENAME = "Other_Products_Price_Tracker.xlsx"
 EXCEL_ALL_FILENAME = "All_Products_Price_Tracker.xlsx"
 
-# Automated Daily Crawl Schedule (Hourly intervals daily starting at 9:00 AM)
-SYNC_INTERVAL_HOURS = list(range(9, 23))  # 9 AM, 10 AM, 11 AM, 12 PM, 1 PM, ..., 10 PM
+# Automated Daily Crawl Schedule: Once every 2 hours in IST (9 AM, 11 AM, 1 PM, 3 PM, 5 PM, 7 PM, 9 PM)
+SYNC_INTERVAL_HOURS = [9, 11, 13, 15, 17, 19, 21]
+
+# Render Free Tier Memory Optimization (256MB RAM):
+# Limit scraper threads to 2 to prevent RAM spikes from concurrent DOM parsers
+SCRAPER_MAX_WORKERS = 2
 
 

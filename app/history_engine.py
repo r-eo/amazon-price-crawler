@@ -1,7 +1,11 @@
 import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from app.config import BASE_AMAZON_URL, HISTORY_MONTHS_COUNT, CURRENCY_CODE, GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS
+from app.config import (
+    BASE_AMAZON_URL, HISTORY_MONTHS_COUNT, CURRENCY_CODE,
+    GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS,
+    now_ist, now_ist_str
+)
 from app.seed_data import ACER_SEED_PRODUCTS
 from app.database import (
     init_db, upsert_product, add_price_history_batch,
@@ -121,25 +125,36 @@ def seed_database_if_empty(force: bool = False):
         if cnt > len(ACER_SEED_PRODUCTS) * (HISTORY_MONTHS_COUNT + 1):
             force = True
 
-    # Check if existing products on disk still hold old pre-fix MRP/base_price baselines
+    # Check if existing products on disk need synchronization (mrp, sort_order, product_group)
     needs_sync = False
     if existing_products:
         seed_map = {p["asin"]: p for p in ACER_SEED_PRODUCTS}
         for p in existing_products:
             s = seed_map.get(p["asin"])
-            if s and abs(p.get("mrp", 0) - s.get("mrp", 0)) > 50:
-                needs_sync = True
-                break
+            if s:
+                if abs(p.get("mrp", 0) - s.get("mrp", 0)) > 50:
+                    needs_sync = True
+                    break
+                if p.get("sort_order") != s.get("sort_order"):
+                    needs_sync = True
+                    break
+                if p.get("product_group") != s.get("product_group"):
+                    needs_sync = True
+                    break
 
-    # Ensure authentic product image URLs from catalog are synchronized into SQLite
+    # Ensure authentic product image URLs, sort_orders, and product_groups are synchronized
     with get_db_connection() as conn:
         cursor = conn.cursor()
         for s in ACER_SEED_PRODUCTS:
-            if s.get("image_url"):
-                cursor.execute(
-                    "UPDATE products SET image_url = ? WHERE asin = ? AND (image_url != ? OR image_url IS NULL)",
-                    (s["image_url"], s["asin"], s["image_url"])
-                )
+            cursor.execute(
+                """
+                UPDATE products 
+                SET sort_order = ?, product_group = ?, image_url = COALESCE(?, image_url)
+                WHERE asin = ?
+                """,
+                (s["sort_order"], s["product_group"], s.get("image_url"), s["asin"])
+            )
+        conn.commit()
 
     if force or needs_sync or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
@@ -147,8 +162,8 @@ def seed_database_if_empty(force: bool = False):
         # Already populated and matching
         return len(existing_products)
     
-    now = datetime.now()
-    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+    now = now_ist()
+    now_str = now_ist_str()
 
     for item in ACER_SEED_PRODUCTS:
         asin = item["asin"]
@@ -159,22 +174,19 @@ def seed_database_if_empty(force: bool = False):
         
         # Today's price is the exact verified catalog price
         todays_price = float(item["base_price"])
-        prev_month_price = history_points[-2]["price"] if len(history_points) >= 2 else todays_price
 
-        grp = item.get("product_group")
-        if not grp:
-            cat = item.get("category", "").lower()
-            grp = GROUP_ACER_MONITORS if ("stand" in cat or "screen" in cat or "monitor" in cat) else GROUP_OTHER_PRODUCTS
+        grp = item.get("product_group", GROUP_OTHER_PRODUCTS)
 
         product_data = {
             "asin": asin,
             "title": item["title"],
             "category": item["category"],
             "product_group": grp,
+            "sort_order": item.get("sort_order", 999),
             "mrp": item["mrp"],
             "current_price": todays_price,
             "currency": CURRENCY_CODE,
-            "stock_status": "In Stock",
+            "stock_status": item.get("stock_status", "In Stock"),
             "rating": item["rating"],
             "review_count": item["review_count"],
             "image_url": item["image_url"],
@@ -200,27 +212,11 @@ def seed_database_if_empty(force: bool = False):
         # Insert history records
         add_price_history_batch(db_history_records)
 
-        # If a price drop occurred recently in the timeline, record an alert
-        for idx in range(len(history_points) - 1, max(0, len(history_points) - 4), -1):
-            curr_p = history_points[idx]["price"]
-            prev_p = history_points[idx - 1]["price"]
-            if curr_p < prev_p - 10:
-                record_price_alert(
-                    asin=asin,
-                    title=item["title"],
-                    category=item["category"],
-                    product_group=grp,
-                    previous_price=prev_p,
-                    new_price=curr_p,
-                    timestamp=history_points[idx]["timestamp"]
-                )
-                break
-
     return len(ACER_SEED_PRODUCTS)
 
 def get_22_month_labels() -> List[str]:
-    """Returns the ordered list of 22 month labels up to current month."""
-    now = datetime.now()
+    """Returns the ordered list of 6 month labels up to current month."""
+    now = now_ist()
     labels = []
     for i in range(HISTORY_MONTHS_COUNT - 1, -1, -1):
         point_date = now - timedelta(days=int(i * 30.4375))

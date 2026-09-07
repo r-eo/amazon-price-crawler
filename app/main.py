@@ -1,9 +1,10 @@
 import os
+import gc
 import asyncio
 import threading
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, Body
@@ -15,13 +16,13 @@ from app.config import (
     STATIC_DIR, CURRENCY_SYMBOL,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
     EXCEL_MONITORS_FILENAME, EXCEL_OTHER_FILENAME, EXCEL_ALL_FILENAME,
-    SYNC_INTERVAL_HOURS
+    SYNC_INTERVAL_HOURS, now_ist, now_ist_str
 )
 from app.database import (
     get_all_products, get_products_by_group, get_product_by_asin,
     get_price_history_for_asin, get_all_price_history, get_product_statistics,
-    delete_product_by_asin, get_recent_price_alerts, mark_alerts_as_read,
-    get_unread_alerts_count, reconcile_and_repair_corrupted_data
+    delete_product_by_asin, get_recent_price_changes, mark_price_changes_as_read,
+    get_unread_price_changes_count, clear_all_price_changes, get_tab_counts
 )
 from app.history_engine import seed_database_if_empty, get_22_month_labels
 from app.scraper import scrape_asin_details, scrape_all_asins
@@ -32,12 +33,12 @@ from app.excel_exporter import (
 
 logger = logging.getLogger("tracker_app")
 
-_last_auto_sync_lock = threading.Lock()
-_last_auto_sync_time: Optional[datetime] = None
+# Global crawl mutex to protect Render 256MB RAM against concurrent crawl jobs / stress tests
+_crawl_lock = threading.Lock()
 
 def get_next_sync_target(now: Optional[datetime] = None) -> datetime:
-    """Calculates next scheduled sync timestamp from the 3 daily intervals (9:00 AM, 1:00 PM, 5:00 PM)."""
-    now = now or datetime.now()
+    """Calculates next scheduled sync timestamp from the 2-hour IST intervals (9 AM, 11 AM, 1 PM, 3 PM, 5 PM, 7 PM, 9 PM)."""
+    now = now or now_ist()
     for h in sorted(SYNC_INTERVAL_HOURS):
         target = now.replace(hour=h, minute=0, second=0, microsecond=0)
         if target > now:
@@ -45,93 +46,40 @@ def get_next_sync_target(now: Optional[datetime] = None) -> datetime:
     tomorrow = now + timedelta(days=1)
     return tomorrow.replace(hour=sorted(SYNC_INTERVAL_HOURS)[0], minute=0, second=0, microsecond=0)
 
-def get_most_recent_scheduled_sync(now: Optional[datetime] = None) -> datetime:
-    """Finds the most recent sync milestone that should have occurred."""
-    now = now or datetime.now()
-    passed_today = [h for h in sorted(SYNC_INTERVAL_HOURS) if now.hour >= h]
-    if passed_today:
-        return now.replace(hour=max(passed_today), minute=0, second=0, microsecond=0)
-    yesterday = now - timedelta(days=1)
-    return yesterday.replace(hour=sorted(SYNC_INTERVAL_HOURS)[-1], minute=0, second=0, microsecond=0)
-
-def check_and_auto_sync_if_stale(force: bool = False):
-    """
-    Checks if products data has missed the most recent scheduled 4-hour sync window.
-    If stale (or on cold start after a scheduled milestone), automatically triggers
-    a background refresh to ensure live data integrity.
-    Throttled to run at most once per 70 minutes.
-    """
-    global _last_auto_sync_time
-    now = datetime.now()
-    if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 4200 and not force:
-        return
-
-    if not _last_auto_sync_lock.acquire(blocking=False):
-        return
-
-    try:
-        if _last_auto_sync_time and (now - _last_auto_sync_time).total_seconds() < 4200 and not force:
-            return
-        
-        products = get_all_products()
-        if not products:
-            return
-
-        is_stale = False
-        scraped_dates = [p.get("last_scraped_at") for p in products if p.get("last_scraped_at")]
-        if not scraped_dates:
-            is_stale = True
-        else:
-            latest_str = max(scraped_dates)
-            try:
-                latest_dt = datetime.strptime(latest_str, "%Y-%m-%d %H:%M:%S")
-                recent_milestone = get_most_recent_scheduled_sync(now)
-                if latest_dt < recent_milestone and (now - recent_milestone).total_seconds() > 300:
-                    is_stale = True
-                elif (now - latest_dt).total_seconds() > 21600:
-                    is_stale = True
-            except Exception:
-                is_stale = True
-
-        if is_stale or force:
-            _last_auto_sync_time = now
-            logger.info("Auto-sync: Detected stale data past scheduled milestone. Launching refresh...")
-            try:
-                scrape_all_asins(GROUP_ACER_MONITORS)
-                scrape_all_asins(GROUP_OTHER_PRODUCTS)
-                export_monitors_excel()
-                export_other_products_excel()
-                export_all_portfolio_excel()
-                logger.info("Auto-sync refresh completed successfully.")
-            except Exception as ex:
-                logger.error(f"Auto-sync refresh failed: {ex}")
-    finally:
-        _last_auto_sync_lock.release()
-
 async def scheduled_sync_loop():
     """
-    Background worker that runs automatically every hour daily starting at 9:00 AM.
-    Crawls products and pre-generates daily 22-Month Excel reports.
+    Background worker that runs automatically every 2 hours daily starting at 9:00 AM IST.
+    Crawls active products and sequentially pre-generates 6-Month Excel reports with memory cleanup.
     """
-    logger.info(f"Daily automated scheduler active: hourly intervals starting at 9 AM: {', '.join(f'{h:02d}:00' for h in SYNC_INTERVAL_HOURS)}.")
+    logger.info(f"Daily automated scheduler active (IST): 2-hour intervals starting at 9 AM: {', '.join(f'{h:02d}:00' for h in SYNC_INTERVAL_HOURS)}.")
     while True:
         try:
-            now = datetime.now()
+            now = now_ist()
             target_time = get_next_sync_target(now)
             delay_seconds = max(5, (target_time - now).total_seconds())
             hours, remainder = divmod(int(delay_seconds), 3600)
             minutes, _ = divmod(remainder, 60)
-            logger.info(f"Daily scheduler: next automated run at {target_time.strftime('%Y-%m-%d %H:%M:%S')} (in {hours}h {minutes}m).")
+            logger.info(f"Daily scheduler: next run at {target_time.strftime('%I:%M %p IST')} (in {hours}h {minutes}m).")
             
             await asyncio.sleep(delay_seconds)
             
-            logger.info(f"Executing scheduled {target_time.strftime('%I:%M %p')} crawl & Excel generation...")
-            await asyncio.to_thread(scrape_all_asins, GROUP_ACER_MONITORS)
-            await asyncio.to_thread(scrape_all_asins, GROUP_OTHER_PRODUCTS)
-            await asyncio.to_thread(export_monitors_excel)
-            await asyncio.to_thread(export_other_products_excel)
-            await asyncio.to_thread(export_all_portfolio_excel)
-            logger.info("Scheduled crawl & Excel generation completed successfully.")
+            # Non-blocking crawl lock
+            if not _crawl_lock.acquire(blocking=False):
+                logger.warning("Scheduled sync skipped: crawl lock currently held.")
+                continue
+
+            try:
+                logger.info(f"Executing scheduled {target_time.strftime('%I:%M %p IST')} crawl & Excel generation...")
+                # Crawl accessories catalog (all 90 items)
+                await asyncio.to_thread(scrape_all_asins, GROUP_OTHER_PRODUCTS)
+                gc.collect()
+                # Sequentially generate Excel workbooks to conserve memory
+                await asyncio.to_thread(export_other_products_excel)
+                await asyncio.to_thread(export_all_portfolio_excel)
+                gc.collect()
+                logger.info("Scheduled crawl & Excel generation completed successfully.")
+            finally:
+                _crawl_lock.release()
             
         except asyncio.CancelledError:
             break
@@ -141,18 +89,16 @@ async def scheduled_sync_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initializes database, runs data integrity check, auto-refreshes if stale, and starts 3-interval daily scheduler."""
+    """Initializes database, ensures correct ordering and categorization, and starts 2-hour IST scheduler."""
     seed_database_if_empty()
-    reconcile_and_repair_corrupted_data()
-    asyncio.create_task(asyncio.to_thread(check_and_auto_sync_if_stale))
     scheduler_task = asyncio.create_task(scheduled_sync_loop())
     yield
     scheduler_task.cancel()
 
 app = FastAPI(
     title="Acer Amazon Price Intelligence Platform",
-    description="Dedicated intelligence dashboards for Acer Monitors and Other Amazon Products with dynamic/daily Excel exports and Price Drop Notifications.",
-    version="3.0.0",
+    description="Intelligence dashboards for Acer Accessories and Monitors with dynamic Excel exports and Real-Time Price Change Tracking.",
+    version="4.0.0",
     lifespan=lifespan
 )
 
@@ -181,14 +127,14 @@ async def add_no_cache_headers(request, call_next):
 # Pydantic models
 class AddAsinRequest(BaseModel):
     asin: str
-    group: str = GROUP_ACER_MONITORS
+    group: str = GROUP_OTHER_PRODUCTS
     title: Optional[str] = None
     category: Optional[str] = None
     mrp: Optional[float] = None
 
 class BatchImportRequest(BaseModel):
     asins: List[str]
-    group: str = GROUP_ACER_MONITORS
+    group: str = GROUP_OTHER_PRODUCTS
     category: Optional[str] = None
 
 class MarkAlertsRequest(BaseModel):
@@ -196,120 +142,124 @@ class MarkAlertsRequest(BaseModel):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "healthy", "version": "3.4.0", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "version": "4.0.0", "timestamp": now_ist_str()}
 
 @app.get("/api/scheduler/status")
 def scheduler_status():
-    """Returns status and next execution time of the hourly daily sync schedule starting at 9 AM."""
-    now = datetime.now()
+    """Returns status and next execution time of the 2-hour IST sync schedule."""
+    now = now_ist()
     target_time = get_next_sync_target(now)
     diff = target_time - now
     hours, remainder = divmod(max(0, int(diff.total_seconds())), 3600)
     minutes, _ = divmod(remainder, 60)
     
-    formatted_time = target_time.strftime("%I:%M %p").lstrip("0")
-    intervals_display = [datetime.strptime(str(h), "%H").strftime("%I:%M %p").lstrip("0") for h in sorted(SYNC_INTERVAL_HOURS)]
+    formatted_time = target_time.strftime("%I:%M %p IST").lstrip("0")
+    intervals_display = [datetime.strptime(str(h), "%H").strftime("%I:%M %p IST").lstrip("0") for h in sorted(SYNC_INTERVAL_HOURS)]
     
     return {
-        "schedule_type": "Hourly Intervals (from 9 AM)",
+        "schedule_type": "Every 2 Hours (IST)",
         "intervals": intervals_display,
-        "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S IST"),
         "next_time_display": formatted_time,
         "time_remaining": f"{hours}h {minutes}m",
         "excel_auto_updates": True
     }
 
+@app.get("/api/tabs/counts")
+def tabs_counts():
+    """Lightweight endpoint returning product counts per tab."""
+    return get_tab_counts()
+
 # =========================================================================
-# Price Drop Alerts & Notifications Endpoints
+# Price Change Notifications Center
 # =========================================================================
 
-@app.get("/api/alerts")
-def list_price_alerts(
+@app.get("/api/notifications")
+def list_notifications(
     limit: int = Query(50, ge=1, le=200),
     unread_only: bool = Query(False)
 ):
-    """Returns recent price drop alerts."""
-    alerts = get_recent_price_alerts(limit=limit, unread_only=unread_only)
-    unread_cnt = get_unread_alerts_count()
+    """Returns recent verified price changes (drops and increases) detected after checks."""
+    changes = get_recent_price_changes(limit=limit, unread_only=unread_only)
+    unread_cnt = get_unread_price_changes_count()
     return {
-        "alerts": alerts,
+        "notifications": changes,
+        "price_changes": changes,
         "unread_count": unread_cnt,
-        "total": len(alerts),
+        "total": len(changes),
         "currency": CURRENCY_SYMBOL
     }
 
+@app.get("/api/notifications/unread-count")
+def unread_notifications_count():
+    """Returns count of unread price changes for the bell badge."""
+    return {"unread_count": get_unread_price_changes_count()}
+
+@app.post("/api/notifications/mark-read")
+def mark_notifications_read(payload: Optional[MarkAlertsRequest] = None):
+    """Marks price changes as read."""
+    ids = payload.alert_ids if payload else None
+    count = mark_price_changes_as_read(ids)
+    return {"status": "success", "marked_count": count, "unread_count": get_unread_price_changes_count()}
+
+@app.post("/api/notifications/clear")
+def clear_notifications():
+    """Clears all price change logs."""
+    clear_all_price_changes()
+    return {"status": "success", "message": "All price change notifications cleared.", "unread_count": 0}
+
+# Legacy aliases for alerts
+@app.get("/api/alerts")
+def list_price_alerts(limit: int = Query(50, ge=1, le=200), unread_only: bool = Query(False)):
+    return list_notifications(limit=limit, unread_only=unread_only)
+
 @app.get("/api/alerts/unread-count")
 def unread_alerts_count_endpoint():
-    """Returns count of unread price alerts for the notification bell badge."""
-    return {"unread_count": get_unread_alerts_count()}
+    return unread_notifications_count()
 
 @app.post("/api/alerts/mark-read")
 def mark_alerts_read_endpoint(payload: Optional[MarkAlertsRequest] = None):
-    """Marks alerts as read."""
-    ids = payload.alert_ids if payload else None
-    count = mark_alerts_as_read(ids)
-    return {"status": "success", "marked_count": count, "unread_count": get_unread_alerts_count()}
+    return mark_notifications_read(payload)
+
+# =========================================================================
+# Live Price Check & Crawler
+# =========================================================================
 
 @app.post("/api/check-prices-daily")
 def trigger_daily_price_check(
-    background_tasks: BackgroundTasks,
     group: Optional[str] = Query(None)
 ):
     """
-    Triggers an instant scan across products to check prices, detect drops,
-    and issue alerts immediately. Scans current tab synchronously when possible.
+    Triggers a live crawl check to detect real price changes.
+    Protected by crawl lock against concurrent execution under stress tests.
     """
-    target_group = group or GROUP_ACER_MONITORS
-    grp_name = "Acer Monitors & Stands" if target_group == GROUP_ACER_MONITORS else ("Other Products" if target_group == GROUP_OTHER_PRODUCTS else "All Products")
+    target_group = group or GROUP_OTHER_PRODUCTS
+    grp_name = "Acer Accessories" if target_group == GROUP_OTHER_PRODUCTS else ("Acer Monitors" if target_group == GROUP_ACER_MONITORS else "All Products")
     
-    if target_group == GROUP_ACER_MONITORS:
+    if not _crawl_lock.acquire(blocking=False):
+        return {
+            "status": "busy",
+            "group": target_group,
+            "message": "A price check crawl is already actively running. Please wait a moment for it to finish."
+        }
+
+    try:
         res = scrape_all_asins(target_group)
         products = get_products_by_group(target_group)
         for p in products:
             p["stats"] = get_product_statistics(p["asin"])
+        
+        changes_cnt = res.get("price_changes_count", 0)
         return {
             "status": "completed",
             "group": target_group,
             "total_scraped": res.get("total", 0),
-            "price_drops_count": res.get("price_drops_count", 0),
+            "price_changes_count": changes_cnt,
             "products": products,
-            "message": f"Live Amazon crawl complete for {grp_name}! Scanned {res.get('total', 0)} items ({res.get('price_drops_count', 0)} price drops detected)."
+            "message": f"Price check complete for {grp_name}! Scanned {res.get('total', 0)} items ({changes_cnt} price changes logged)."
         }
-    else:
-        # For larger groups: Crawl the first 12 visible items synchronously so table updates immediately!
-        all_prods = get_products_by_group(target_group)
-        first_batch = all_prods[:12]
-        rest_batch = all_prods[12:]
-        
-        from concurrent.futures import ThreadPoolExecutor
-        def _task(p):
-            return scrape_asin_details(p["asin"], group=p.get("product_group"), category=p.get("category"))
-        
-        with ThreadPoolExecutor(max_workers=4) as ex:
-            results = list(ex.map(_task, first_batch))
-        
-        # Queue the remaining items in background
-        def _crawl_rest():
-            with ThreadPoolExecutor(max_workers=4) as ex:
-                list(ex.map(_task, rest_batch))
-            from app.excel_exporter import export_excel_by_group
-            export_excel_by_group(target_group)
-        
-        background_tasks.add_task(_crawl_rest)
-        
-        updated_products = get_products_by_group(target_group)
-        for p in updated_products:
-            p["stats"] = get_product_statistics(p["asin"])
-            
-        drops_count = sum(1 for r in results if r.get("price_dropped"))
-        return {
-            "status": "completed",
-            "group": target_group,
-            "total_scraped": len(first_batch),
-            "price_drops_count": drops_count,
-            "products": updated_products,
-            "message": f"Live Amazon scan updated visible items for {grp_name}! ({len(first_batch)} items scanned, background continuing for remaining)."
-        }
+    finally:
+        _crawl_lock.release()
 
 @app.post("/api/scrape")
 def api_scrape_endpoint(
@@ -317,16 +267,14 @@ def api_scrape_endpoint(
     asin: Optional[str] = Query(None),
     group: Optional[str] = Query(None)
 ):
-    """
-    Crawls Amazon live for a single ASIN synchronously or an entire group asynchronously.
-    """
+    """Crawls Amazon live for a single ASIN synchronously or an entire group."""
     if asin:
         clean_asin = asin.strip().upper()
         res = scrape_asin_details(asin=clean_asin)
         prod = get_product_by_asin(clean_asin)
         if prod:
             prod["stats"] = get_product_statistics(clean_asin)
-            background_tasks.add_task(export_excel_by_group, prod.get("product_group", GROUP_ACER_MONITORS))
+            background_tasks.add_task(export_excel_by_group, prod.get("product_group", GROUP_OTHER_PRODUCTS))
         return {
             "status": "completed" if res.get("success") else "failed",
             "asin": clean_asin,
@@ -334,7 +282,19 @@ def api_scrape_endpoint(
             "message": res.get("message")
         }
     
-    background_tasks.add_task(scrape_all_asins, group)
+    if not _crawl_lock.acquire(blocking=False):
+        return {
+            "status": "busy",
+            "message": "A crawl job is already in progress. Please wait for it to complete."
+        }
+    
+    def _run_scrape():
+        try:
+            scrape_all_asins(group)
+        finally:
+            _crawl_lock.release()
+
+    background_tasks.add_task(_run_scrape)
     return {
         "status": "queued",
         "message": f"Crawl job queued for {group or 'all products'}."
@@ -342,16 +302,24 @@ def api_scrape_endpoint(
 
 @app.api_route("/api/cron/sync", methods=["GET", "POST"])
 def vercel_cron_sync(background_tasks: BackgroundTasks):
-    """Vercel Cron endpoint triggered at 9 AM, 1 PM, 5 PM IST (every 4 hours)."""
-    background_tasks.add_task(scrape_all_asins, GROUP_ACER_MONITORS)
-    background_tasks.add_task(scrape_all_asins, GROUP_OTHER_PRODUCTS)
-    background_tasks.add_task(export_monitors_excel)
-    background_tasks.add_task(export_other_products_excel)
-    background_tasks.add_task(export_all_portfolio_excel)
+    """Vercel Cron endpoint triggered every 2 hours during daytime."""
+    if not _crawl_lock.acquire(blocking=False):
+        return {"status": "busy", "message": "Crawl already running."}
+    
+    def _run_cron():
+        try:
+            scrape_all_asins(GROUP_OTHER_PRODUCTS)
+            export_other_products_excel()
+            export_all_portfolio_excel()
+            gc.collect()
+        finally:
+            _crawl_lock.release()
+
+    background_tasks.add_task(_run_cron)
     return {
         "status": "success",
-        "message": "3-Interval sync triggered via cron across all products.",
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "message": "2-Hour sync triggered via cron across active catalog.",
+        "timestamp": now_ist_str()
     }
 
 # =========================================================================
@@ -360,14 +328,15 @@ def vercel_cron_sync(background_tasks: BackgroundTasks):
 
 @app.get("/api/products")
 def list_products(
-    background_tasks: BackgroundTasks,
     group: Optional[str] = Query(None),
     category: Optional[str] = None,
     search: Optional[str] = None,
     price_drops_only: bool = Query(False)
 ):
-    """Returns list of tracked products filtered by group, category, search, or price drops."""
-    background_tasks.add_task(check_and_auto_sync_if_stale)
+    """
+    Returns list of tracked products strictly ordered by sort_order ASC.
+    Memory-efficient: no automatic background crawl tasks attached to regular page views.
+    """
     products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()
@@ -384,7 +353,6 @@ def list_products(
                 
         stats = get_product_statistics(p["asin"])
         if price_drops_only:
-            # Check if there's a recent drop
             hist = get_price_history_for_asin(p["asin"])
             if len(hist) < 2 or hist[-1]["price"] >= hist[-2]["price"]:
                 continue
@@ -402,7 +370,7 @@ def list_products(
 
 @app.get("/api/products/{asin}")
 def get_product_details(asin: str):
-    """Returns single product details, statistics, and full 22-month timeline."""
+    """Returns single product details, statistics, and 6-month timeline."""
     product = get_product_by_asin(asin)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -432,7 +400,6 @@ def add_single_asin(payload: AddAsinRequest, background_tasks: BackgroundTasks):
         custom_mrp=payload.mrp
     )
     
-    # Trigger dynamic Excel re-export for this group in background
     background_tasks.add_task(export_excel_by_group, payload.group)
     
     return {
@@ -448,7 +415,7 @@ def batch_import_asins(payload: BatchImportRequest, background_tasks: Background
     for raw_asin in payload.asins:
         clean = raw_asin.strip().upper()
         if clean and len(clean) == 10:
-            res = scrape_asin_details(asin=clean, group=payload.group, category=payload.category)
+            scrape_asin_details(asin=clean, group=payload.group, category=payload.category)
             imported.append(clean)
             
     background_tasks.add_task(export_excel_by_group, payload.group)
@@ -467,7 +434,7 @@ def delete_product(asin: str, background_tasks: BackgroundTasks):
     if not prod:
         raise HTTPException(status_code=404, detail="Product not found")
         
-    grp = prod.get("product_group", GROUP_ACER_MONITORS)
+    grp = prod.get("product_group", GROUP_OTHER_PRODUCTS)
     delete_product_by_asin(clean_asin)
     background_tasks.add_task(export_excel_by_group, grp)
     
@@ -475,11 +442,9 @@ def delete_product(asin: str, background_tasks: BackgroundTasks):
 
 @app.get("/api/stats")
 def get_dashboard_stats(
-    background_tasks: BackgroundTasks,
     group: Optional[str] = Query(None)
 ):
     """Calculates overall statistics and KPI aggregations for the requested dashboard group."""
-    background_tasks.add_task(check_and_auto_sync_if_stale)
     products = get_products_by_group(group)
     if not products:
         seed_database_if_empty()
@@ -495,7 +460,7 @@ def get_dashboard_stats(
             "atl_deals_count": 0,
             "near_atl_count": 0,
             "price_drops_count": 0,
-            "unread_alerts_count": get_unread_alerts_count(),
+            "unread_alerts_count": get_unread_price_changes_count(),
             "category_breakdown": {},
             "month_labels": get_22_month_labels(),
             "category_trends": {},
@@ -586,49 +551,27 @@ def get_dashboard_stats(
         "price_drops_count": len(price_drops),
         "top_price_drop": top_drop,
         "recent_price_drops": price_drops[:10],
-        "unread_alerts_count": get_unread_alerts_count(),
+        "unread_alerts_count": get_unread_price_changes_count(),
         "category_breakdown": category_breakdown,
         "month_labels": month_labels,
         "category_trends": category_trends,
         "currency": CURRENCY_SYMBOL
     }
 
-@app.post("/api/scrape")
-def trigger_scrape(
-    background_tasks: BackgroundTasks,
-    asin: Optional[str] = Query(None),
-    group: Optional[str] = Query(None)
-):
-    """Triggers an Amazon crawl for a single ASIN or a specific dashboard group."""
-    if asin:
-        res = scrape_asin_details(asin)
-        # Auto update Excel for that product's group
-        prod = get_product_by_asin(asin)
-        if prod:
-            background_tasks.add_task(export_excel_by_group, prod.get("product_group", GROUP_ACER_MONITORS))
-        return {"status": "completed", "result": res}
-    else:
-        background_tasks.add_task(scrape_all_asins, group)
-        grp_name = "Acer Monitors & Stands" if group == GROUP_ACER_MONITORS else ("Other Products" if group == GROUP_OTHER_PRODUCTS else "All Products")
-        return {
-            "status": "queued",
-            "message": f"Live Amazon crawl started for {grp_name}. Dashboard will update dynamically."
-        }
-
 @app.get("/api/export/excel")
 def download_excel_export(group: Optional[str] = Query(None)):
-    """Generates and returns the formatted Excel file for the requested group."""
+    """Generates and returns the formatted Excel file strictly preserving sort order."""
     grp = (group or GROUP_ALL).lower()
     
     if grp == GROUP_ACER_MONITORS:
         excel_path = export_monitors_excel()
-        filename = f"Acer_Monitors_Price_Tracker_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"Acer_Monitors_Price_Tracker_{now_ist().strftime('%Y%m%d')}.xlsx"
     elif grp == GROUP_OTHER_PRODUCTS:
         excel_path = export_other_products_excel()
-        filename = f"Other_Products_Price_Tracker_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"Other_Products_Price_Tracker_{now_ist().strftime('%Y%m%d')}.xlsx"
     else:
         excel_path = export_all_portfolio_excel()
-        filename = f"All_Products_Price_Tracker_{datetime.now().strftime('%Y%m%d')}.xlsx"
+        filename = f"All_Products_Price_Tracker_{now_ist().strftime('%Y%m%d')}.xlsx"
     
     return FileResponse(
         path=excel_path,
@@ -638,4 +581,3 @@ def download_excel_export(group: Optional[str] = Query(None)):
 
 # Mount static frontend
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
-

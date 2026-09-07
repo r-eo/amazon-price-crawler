@@ -1,5 +1,6 @@
 import re
 import time
+import gc
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -7,11 +8,12 @@ from bs4 import BeautifulSoup
 
 from app.config import (
     BASE_AMAZON_URL, DEFAULT_HEADERS,
-    GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL
+    GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
+    SCRAPER_MAX_WORKERS, now_ist, now_ist_str
 )
 from app.database import (
     upsert_product, add_price_history_batch, get_product_by_asin,
-    get_products_by_group, get_all_products, record_price_alert
+    get_products_by_group, get_all_products, record_price_change
 )
 from app.seed_data import ACER_SEED_PRODUCTS
 from app.history_engine import seed_custom_asin_timeline
@@ -408,9 +410,18 @@ def scrape_asin_details(
     if not image_url and existing:
         image_url = existing.get("image_url")
 
-    # Group determination
-    target_group = group or (existing.get("product_group") if existing else (GROUP_ACER_MONITORS if "monitor" in (category or "").lower() else GROUP_OTHER_PRODUCTS))
-    target_category = category or (existing.get("category") if existing else ("Monitors" if target_group == GROUP_ACER_MONITORS else "General"))
+    # Render Free Tier Memory Optimization: Free DOM tree from memory immediately
+    del soup
+    del html_content
+    gc.collect()
+
+    now_str = now_ist_str()
+    now_date_str = now_ist_str("%Y-%m-%d")
+    now_month_str = now_ist_str("%b %Y")
+
+    # Group determination - default to other_products (accessories)
+    target_group = group or (existing.get("product_group") if existing else GROUP_OTHER_PRODUCTS)
+    target_category = category or (existing.get("category") if existing else "General")
 
     final_price = price if price else (existing.get("current_price") if existing else 14999.0)
     final_mrp = mrp if mrp else (existing.get("mrp") if existing else (final_price * 1.25))
@@ -421,6 +432,7 @@ def scrape_asin_details(
         "title": final_title,
         "category": target_category,
         "product_group": target_group,
+        "sort_order": existing.get("sort_order", 999) if existing else 999,
         "mrp": final_mrp,
         "current_price": final_price,
         "currency": existing.get("currency", "INR") if existing else "INR",
@@ -438,13 +450,13 @@ def scrape_asin_details(
     else:
         upsert_product(updated_product)
 
-    # Check if price changed or dropped
+    # Check if price changed (either dropped or increased)
     price_changed = (prev_price is not None and abs(prev_price - final_price) > 0.01)
     price_dropped = (prev_price is not None and final_price < prev_price - 0.01)
-    drop_info = None
+    change_info = None
 
-    if price_dropped:
-        drop_info = record_price_alert(
+    if price_changed:
+        change_info = record_price_change(
             asin=asin,
             title=final_title,
             category=target_category,
@@ -453,16 +465,16 @@ def scrape_asin_details(
             new_price=final_price,
             timestamp=now_str
         )
-        logger.info(f"PRICE DROP ALERT: ASIN {asin} dropped from ₹{prev_price} to ₹{final_price}!")
+        logger.info(f"PRICE CHANGE: ASIN {asin} changed from ₹{prev_price} to ₹{final_price} ({'drop' if price_dropped else 'increase'})!")
 
     # Append live point to history
     add_price_history_batch([{
         "asin": asin,
-        "timestamp": datetime.now().strftime("%Y-%m-%d"),
-        "month_label": datetime.now().strftime("%b %Y"),
+        "timestamp": now_date_str,
+        "month_label": now_month_str,
         "price": final_price,
         "is_sale": 1 if price_dropped else 0,
-        "sale_tag": "Price Drop" if price_dropped else "Live Crawl",
+        "sale_tag": "Price Drop" if price_dropped else ("Price Change" if price_changed else "Live Crawl"),
         "source": "live_scraper"
     }])
 
@@ -473,7 +485,8 @@ def scrape_asin_details(
         "price_dropped": price_dropped,
         "previous_price": prev_price,
         "new_price": final_price,
-        "drop_info": drop_info,
+        "change_info": change_info,
+        "drop_info": change_info,
         "message": f"Updated ASIN {asin} (Price: {final_price})",
         "data": updated_product
     }
@@ -481,7 +494,8 @@ def scrape_asin_details(
 def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
     """
     Scrapes all tracked products for a specific group or full portfolio.
-    Detects price drops, creates notification alerts, and triggers Excel auto-regeneration.
+    Detects price changes, logs verified changes, and triggers Excel auto-regeneration.
+    Memory optimized for Render Free Tier (256MB RAM).
     """
     from app.excel_exporter import export_excel_by_group
     from app.history_engine import seed_database_if_empty
@@ -493,28 +507,33 @@ def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
 
     results = []
     any_price_changed = False
-    price_drops_found = []
+    price_changes_found = []
 
     from concurrent.futures import ThreadPoolExecutor
 
     def _scrape_one(p):
         a = p["asin"]
         logger.info(f"Crawling ASIN: {a} (Group: {p.get('product_group')})...")
+        time.sleep(0.15)  # Polite throttle to smooth CPU/RAM spikes
         return scrape_asin_details(a, group=p.get("product_group"), category=p.get("category"))
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=SCRAPER_MAX_WORKERS) as executor:
         results = list(executor.map(_scrape_one, products))
+
+    # Free memory after full batch
+    gc.collect()
 
     for res in results:
         if res.get("price_changed"):
             any_price_changed = True
-        if res.get("price_dropped") and res.get("drop_info"):
-            price_drops_found.append(res.get("drop_info"))
+        if res.get("change_info"):
+            price_changes_found.append(res.get("change_info"))
 
-    # Dynamic Trigger: Ensure fresh Excel export
+    # Dynamic Trigger: Sequential Excel export
     try:
         target_grp = group or GROUP_ALL
         export_excel_by_group(target_grp)
+        gc.collect()
         logger.info(f"Dynamic Excel export auto-regenerated for group '{target_grp}'.")
     except Exception as e:
         logger.error(f"Failed to auto-export Excel: {e}")
@@ -523,8 +542,8 @@ def scrape_all_asins(group: Optional[str] = None) -> Dict[str, Any]:
         "total": len(products),
         "group": group or "all",
         "any_price_changed": any_price_changed,
-        "price_drops_count": len(price_drops_found),
-        "price_drops": price_drops_found,
+        "price_changes_count": len(price_changes_found),
+        "price_changes": price_changes_found,
         "results": results,
-        "completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "completed_at": now_ist_str()
     }

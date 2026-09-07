@@ -43,15 +43,15 @@
         <div class="nav-center">
           <!-- Segmented Tab Switcher Integrated in Navbar -->
           <div class="tab-switcher">
-            <button class="tab-btn active" data-group="acer_monitors" onclick="switchDashboard('acer_monitors')">
-              <i class="fa-solid fa-display"></i>
-              <span>Acer Monitors</span>
-              <span class="tab-badge" id="badgeMonitorsCount">--</span>
-            </button>
-            <button class="tab-btn" data-group="other_products" onclick="switchDashboard('other_products')">
+            <button class="tab-btn active" data-group="other_products" onclick="switchDashboard('other_products')">
               <i class="fa-solid fa-boxes-stacked"></i>
               <span>Other Accessories</span>
               <span class="tab-badge" id="badgeOtherCount">--</span>
+            </button>
+            <button class="tab-btn" data-group="acer_monitors" onclick="switchDashboard('acer_monitors')">
+              <i class="fa-solid fa-display"></i>
+              <span>Acer Monitors</span>
+              <span class="tab-badge" id="badgeMonitorsCount">--</span>
             </button>
             <button class="tab-btn" data-group="all" onclick="switchDashboard('all')">
               <i class="fa-solid fa-layer-group"></i>
@@ -62,15 +62,15 @@
         </div>
 
         <div class="nav-right">
-          <!-- Live Hourly Scheduler Status -->
-          <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every hour starting at 9:00 AM">
+          <!-- Live 2-Hour Scheduler Status (IST) -->
+          <div class="status-indicator" id="schedulerStatusIndicator" title="Automated sync scheduled daily every 2 hours in IST (9 AM to 9 PM)">
             <span class="status-dot"></span>
-            <span id="schedulerStatusText">Hourly Sync (from 9 AM)</span>
+            <span id="schedulerStatusText">Sync Every 2 Hours (IST)</span>
           </div>
 
           <!-- Notification Bell with Unread Badge & Dropdown -->
           <div class="notification-wrapper">
-            <button id="btnNotificationBell" class="btn btn-icon btn-outline notification-bell-btn" onclick="toggleNotificationPanel(event)" title="Price Drop Notifications">
+            <button id="btnNotificationBell" class="btn btn-icon btn-outline notification-bell-btn" onclick="toggleNotificationPanel(event)" title="Price Change Feed">
               <i class="fa-solid fa-bell"></i>
               <span id="unreadAlertBadge" class="notification-badge" style="display: none;">0</span>
             </button>
@@ -80,12 +80,15 @@
               <div class="notification-header">
                 <div class="notif-title">
                   <i class="fa-solid fa-bolt text-amber"></i>
-                  <span>Price Drop Alerts</span>
+                  <span>Price Change Feed</span>
                   <span class="notif-count-pill" id="notifPanelCount">0</span>
                 </div>
                 <div class="notif-actions">
-                  <button class="btn-link" onclick="markAllAlertsAsRead()" title="Mark all alerts as read">
-                    <i class="fa-solid fa-check-double"></i> Mark all read
+                  <button class="btn-link" onclick="markAllNotificationsAsRead()" title="Mark all as read">
+                    <i class="fa-solid fa-check-double"></i> Read
+                  </button>
+                  <button class="btn-link text-muted" onclick="clearAllNotifications()" title="Clear notifications" style="margin-left: 8px;">
+                    <i class="fa-solid fa-trash-can"></i> Clear
                   </button>
                 </div>
               </div>
@@ -93,13 +96,13 @@
               <div class="notification-list" id="notificationList">
                 <div class="notification-empty">
                   <i class="fa-solid fa-bell-slash"></i>
-                  <p>No price drop alerts yet. Run a daily check to scan for deals!</p>
+                  <p>No price changes logged yet. Click 'Check Prices' to run a live check!</p>
                 </div>
               </div>
 
               <div class="notification-footer">
                 <button class="btn btn-xs btn-primary full-width" onclick="triggerDailyPriceCheck()">
-                  <i class="fa-solid fa-magnifying-glass-dollar"></i> Scan Amazon Prices Now
+                  <i class="fa-solid fa-magnifying-glass-dollar"></i> Check Prices Now (Live Crawl)
                 </button>
               </div>
             </div>
@@ -108,13 +111,13 @@
           <!-- Action Buttons Group -->
           <div class="nav-actions">
             <!-- Download Dedicated Group Excel Report -->
-            <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
+            <a href="/api/export/excel?group=other_products" id="btnDownloadExcel" class="btn btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
               <i class="fa-solid fa-file-excel"></i>
               <span id="downloadBtnText">Export Excel</span>
             </a>
 
             <!-- Check Prices Now (Instant Daily Scan) -->
-            <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()" title="Trigger instant price drop check">
+            <button id="btnCheckPrices" class="btn btn-emerald" onclick="triggerDailyPriceCheck()" title="Trigger instant price check">
               <i class="fa-solid fa-bolt"></i>
               <span>Check Prices</span>
             </button>
@@ -272,7 +275,7 @@
 
             <div class="toolbar-right">
               <span class="table-count" id="tableResultCount">Showing 0 products</span>
-              <a href="/api/export/excel?group=acer_monitors" id="btnDownloadExcelTable" class="btn btn-sm btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
+              <a href="/api/export/excel?group=other_products" id="btnDownloadExcelTable" class="btn btn-sm btn-primary" onclick="downloadGroupExcel(event)" title="Download 6-Month Excel Matrix (.xlsx)">
                 <i class="fa-solid fa-file-excel"></i>
                 <span id="downloadTableBtnText">Export Excel</span>
               </a>

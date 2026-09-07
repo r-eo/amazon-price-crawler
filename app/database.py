@@ -1,7 +1,10 @@
 import sqlite3
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from app.config import DATABASE_PATH, GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS
+from app.config import (
+    DATABASE_PATH, GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
+    now_ist, now_ist_str
+)
 
 def get_db_connection() -> sqlite3.Connection:
     """Returns a SQLite connection with row factory enabled."""
@@ -20,7 +23,8 @@ def init_db():
                 asin TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 category TEXT NOT NULL,
-                product_group TEXT DEFAULT 'acer_monitors',
+                product_group TEXT DEFAULT 'other_products',
+                sort_order INTEGER DEFAULT 999,
                 mrp REAL NOT NULL,
                 current_price REAL NOT NULL,
                 currency TEXT DEFAULT 'INR',
@@ -34,15 +38,22 @@ def init_db():
             )
         """)
         
-        # Migration: Ensure product_group column exists on pre-existing tables
+        # Migration: Ensure product_group and sort_order columns exist
         cursor.execute("PRAGMA table_info(products)")
         columns = [row["name"] for row in cursor.fetchall()]
         if "product_group" not in columns:
-            cursor.execute("ALTER TABLE products ADD COLUMN product_group TEXT DEFAULT 'acer_monitors'")
-            cursor.execute("UPDATE products SET product_group = 'acer_monitors' WHERE category = 'Monitors'")
-            cursor.execute("UPDATE products SET product_group = 'other_products' WHERE category != 'Monitors'")
+            cursor.execute("ALTER TABLE products ADD COLUMN product_group TEXT DEFAULT 'other_products'")
+        if "sort_order" not in columns:
+            cursor.execute("ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 999")
 
-        # Price history table (contains 22-month timeline and live scrapes)
+        # Move monitor stands and privacy screens to other_products (accessories)
+        cursor.execute("""
+            UPDATE products 
+            SET product_group = 'other_products' 
+            WHERE asin IN ('B0DCW32MB9', 'B0DCW28VCS', 'B0FQDD56FW', 'B0GZWS5CL1', 'B0DMP3Q1TV', 'B0DMP1272V')
+        """)
+
+        # Price history table (contains historical timeline and live scrapes)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS price_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +68,26 @@ def init_db():
             )
         """)
 
-        # Price alerts table (tracks daily price drop events and notifications)
+        # Price changes table (tracks real verified price shifts after each crawl)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS price_changes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                asin TEXT NOT NULL,
+                title TEXT NOT NULL,
+                category TEXT,
+                product_group TEXT,
+                previous_price REAL NOT NULL,
+                new_price REAL NOT NULL,
+                change_amount REAL NOT NULL,
+                change_pct REAL NOT NULL,
+                change_type TEXT NOT NULL, -- 'drop' or 'increase'
+                timestamp TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                FOREIGN KEY (asin) REFERENCES products(asin) ON DELETE CASCADE
+            )
+        """)
+        
+        # Legacy price alerts table (for backwards compatibility)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS price_alerts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,35 +105,40 @@ def init_db():
             )
         """)
         
-        # Index on asin and timestamp for fast lookups
+        # Indexes for fast lookups
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_asin ON price_history(asin)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON price_history(timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_group ON products(product_group)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_created ON price_alerts(created_at)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_alerts_read ON price_alerts(is_read)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_products_sort ON products(sort_order)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_changes_timestamp ON price_changes(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_changes_read ON price_changes(is_read)")
         
         conn.commit()
 
 def upsert_product(product_data: Dict[str, Any]):
-    """Inserts or updates a product record including its product_group."""
-    # Ensure default product_group if missing
+    """Inserts or updates a product record including its product_group and sort_order."""
     if "product_group" not in product_data or not product_data["product_group"]:
         cat = product_data.get("category", "")
-        product_data["product_group"] = GROUP_ACER_MONITORS if ("stand" in cat.lower() or "screen" in cat.lower() or "monitor" in cat.lower()) else GROUP_OTHER_PRODUCTS
+        # All stands and screens belong to other_products as per user request
+        product_data["product_group"] = GROUP_OTHER_PRODUCTS
+
+    if "sort_order" not in product_data or product_data["sort_order"] is None:
+        product_data["sort_order"] = 999
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO products (
-                asin, title, category, product_group, mrp, current_price, currency,
+                asin, title, category, product_group, sort_order, mrp, current_price, currency,
                 stock_status, rating, review_count, image_url, url, last_scraped_at
             ) VALUES (
-                :asin, :title, :category, :product_group, :mrp, :current_price, :currency,
+                :asin, :title, :category, :product_group, :sort_order, :mrp, :current_price, :currency,
                 :stock_status, :rating, :review_count, :image_url, :url, :last_scraped_at
             ) ON CONFLICT(asin) DO UPDATE SET
                 title = excluded.title,
                 category = excluded.category,
                 product_group = excluded.product_group,
+                sort_order = CASE WHEN excluded.sort_order < 999 THEN excluded.sort_order ELSE products.sort_order END,
                 mrp = excluded.mrp,
                 current_price = excluded.current_price,
                 stock_status = excluded.stock_status,
@@ -119,6 +154,7 @@ def delete_product_by_asin(asin: str) -> bool:
     """Deletes a product, its price history, and alerts by ASIN."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_changes WHERE asin = ?", (asin,))
         cursor.execute("DELETE FROM price_alerts WHERE asin = ?", (asin,))
         cursor.execute("DELETE FROM price_history WHERE asin = ?", (asin,))
         cursor.execute("DELETE FROM products WHERE asin = ?", (asin,))
@@ -140,7 +176,7 @@ def add_price_history_batch(records: List[Dict[str, Any]]):
 
 def add_single_price_point(asin: str, price: float, timestamp: str = None, month_label: str = None, source: str = "live_crawl", is_sale: int = 0, sale_tag: str = None):
     """Inserts a single new price observation into the history table."""
-    now = datetime.now()
+    now = now_ist()
     if not timestamp:
         timestamp = now.strftime("%Y-%m-%d")
     if not month_label:
@@ -154,7 +190,7 @@ def add_single_price_point(asin: str, price: float, timestamp: str = None, month
         """, (asin, timestamp, month_label, price, is_sale, sale_tag, source))
         conn.commit()
 
-def record_price_alert(
+def record_price_change(
     asin: str,
     title: str,
     category: str,
@@ -164,98 +200,142 @@ def record_price_alert(
     timestamp: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Records a price drop notification alert in the database if new_price < previous_price.
+    Records a real verified price change event (drop or increase) after each crawl check.
     """
-    if new_price >= previous_price:
+    if previous_price is None or abs(previous_price - new_price) < 0.01:
         return None
 
-    drop_amount = round(previous_price - new_price, 2)
-    drop_pct = round((drop_amount / previous_price) * 100, 1) if previous_price > 0 else 0.0
-    now_str = timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    raw_diff = round(new_price - previous_price, 2)
+    change_type = "drop" if raw_diff < 0 else "increase"
+    abs_amount = round(abs(raw_diff), 2)
+    pct = round((abs_amount / previous_price) * 100, 1) if previous_price > 0 else 0.0
+    now_str = timestamp or now_ist_str()
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO price_alerts (
-                asin, title, category, product_group, previous_price, new_price, drop_amount, drop_pct, created_at, is_read
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-        """, (asin, title, category, product_group, previous_price, new_price, drop_amount, drop_pct, now_str))
+            INSERT INTO price_changes (
+                asin, title, category, product_group, previous_price, new_price,
+                change_amount, change_pct, change_type, timestamp, is_read
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        """, (asin, title, category, product_group, previous_price, new_price, abs_amount, pct, change_type, now_str))
         conn.commit()
-        alert_id = cursor.lastrowid
+        change_id = cursor.lastrowid
 
     return {
-        "id": alert_id,
+        "id": change_id,
         "asin": asin,
         "title": title,
         "category": category,
         "product_group": product_group,
         "previous_price": previous_price,
         "new_price": new_price,
-        "drop_amount": drop_amount,
-        "drop_pct": drop_pct,
-        "created_at": now_str,
+        "change_amount": abs_amount,
+        "change_pct": pct,
+        "change_type": change_type,
+        "timestamp": now_str,
         "is_read": 0
     }
 
-def get_recent_price_alerts(limit: int = 50, unread_only: bool = False) -> List[Dict[str, Any]]:
-    """Fetches recent price drop alerts ordered by timestamp descending."""
+def get_recent_price_changes(limit: int = 50, unread_only: bool = False) -> List[Dict[str, Any]]:
+    """Fetches recent price changes ordered by id descending."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
         if unread_only:
             cursor.execute("""
-                SELECT * FROM price_alerts 
+                SELECT * FROM price_changes 
                 WHERE is_read = 0 
-                ORDER BY created_at DESC, id DESC 
+                ORDER BY id DESC 
                 LIMIT ?
             """, (limit,))
         else:
             cursor.execute("""
-                SELECT * FROM price_alerts 
-                ORDER BY created_at DESC, id DESC 
+                SELECT * FROM price_changes 
+                ORDER BY id DESC 
                 LIMIT ?
             """, (limit,))
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
-def mark_alerts_as_read(alert_ids: Optional[List[int]] = None) -> int:
-    """Marks specified alerts or all unread alerts as read."""
+def mark_price_changes_as_read(change_ids: Optional[List[int]] = None) -> int:
+    """Marks specified price changes or all unread changes as read."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        if alert_ids:
-            placeholders = ",".join("?" for _ in alert_ids)
-            cursor.execute(f"UPDATE price_alerts SET is_read = 1 WHERE id IN ({placeholders})", alert_ids)
+        if change_ids:
+            placeholders = ",".join("?" for _ in change_ids)
+            cursor.execute(f"UPDATE price_changes SET is_read = 1 WHERE id IN ({placeholders})", change_ids)
         else:
-            cursor.execute("UPDATE price_alerts SET is_read = 1 WHERE is_read = 0")
+            cursor.execute("UPDATE price_changes SET is_read = 1 WHERE is_read = 0")
         conn.commit()
         return cursor.rowcount
 
-def get_unread_alerts_count() -> int:
-    """Returns total count of unread price alerts."""
+def clear_all_price_changes():
+    """Clears all price change logs."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(id) as cnt FROM price_alerts WHERE is_read = 0")
+        cursor.execute("DELETE FROM price_changes")
+        conn.commit()
+
+def get_unread_price_changes_count() -> int:
+    """Returns count of unread price changes."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(id) as cnt FROM price_changes WHERE is_read = 0")
         row = cursor.fetchone()
         return row["cnt"] if row else 0
+
+# Backwards compatibility wrappers
+def record_price_alert(asin, title, category, product_group, previous_price, new_price, timestamp=None):
+    return record_price_change(asin, title, category, product_group, previous_price, new_price, timestamp)
+
+def get_recent_price_alerts(limit=50, unread_only=False):
+    return get_recent_price_changes(limit, unread_only)
+
+def mark_alerts_as_read(alert_ids=None):
+    return mark_price_changes_as_read(alert_ids)
+
+def get_unread_alerts_count():
+    return get_unread_price_changes_count()
+
+def get_tab_counts() -> Dict[str, int]:
+    """Fast aggregate SQL query to return product counts per tab."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT product_group, COUNT(*) as cnt 
+            FROM products 
+            GROUP BY product_group
+        """)
+        rows = cursor.fetchall()
+        counts = {row["product_group"]: row["cnt"] for row in rows}
+        monitors = counts.get(GROUP_ACER_MONITORS, 0)
+        other = counts.get(GROUP_OTHER_PRODUCTS, 0)
+        return {
+            "acer_monitors": monitors,
+            "other_products": other,
+            "all": monitors + other
+        }
 
 def clear_all_products_and_history():
     """Clears all products, price history, and alerts for a clean database reseed."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM price_changes")
         cursor.execute("DELETE FROM price_alerts")
         cursor.execute("DELETE FROM price_history")
         cursor.execute("DELETE FROM products")
         conn.commit()
 
 def get_all_products() -> List[Dict[str, Any]]:
-    """Fetches all products ordered by group, category and title."""
+    """Fetches all products strictly ordered by sort_order ASC, asin ASC."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products ORDER BY product_group, category, title")
+        cursor.execute("SELECT * FROM products ORDER BY sort_order ASC, asin ASC")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
 def get_products_by_group(group: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches products filtered by group ('acer_monitors' or 'other_products')."""
+    """Fetches products filtered by group strictly ordered by sort_order ASC, asin ASC."""
     if not group or group.lower() in ("all", "both"):
         return get_all_products()
 
@@ -264,10 +344,11 @@ def get_products_by_group(group: Optional[str] = None) -> List[Dict[str, Any]]:
         cursor.execute("""
             SELECT * FROM products 
             WHERE LOWER(product_group) = LOWER(?) 
-            ORDER BY category, title
+            ORDER BY sort_order ASC, asin ASC
         """, (group,))
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
 
 def get_product_by_asin(asin: str) -> Optional[Dict[str, Any]]:
     """Fetches a single product by ASIN."""
