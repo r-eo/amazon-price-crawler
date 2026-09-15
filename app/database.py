@@ -338,10 +338,10 @@ def clear_all_products_and_history():
         conn.commit()
 
 def get_all_products() -> List[Dict[str, Any]]:
-    """Fetches all products strictly ordered by sort_order ASC, asin ASC."""
+    """Fetches all products strictly ordered by group (Monitors 1-61 then Accessories 1-90)."""
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM products ORDER BY sort_order ASC, asin ASC")
+        cursor.execute("SELECT * FROM products ORDER BY CASE WHEN product_group = 'acer_monitors' THEN 1 ELSE 2 END, sort_order ASC, asin ASC")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 

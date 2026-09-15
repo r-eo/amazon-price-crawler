@@ -162,11 +162,11 @@ function renderKpiCards(stats) {
   const kpiSubtextScope = document.getElementById("kpiSubtextScope");
   if (kpiSubtextScope) {
     if (currentGroup === "acer_monitors") {
-      kpiSubtextScope.textContent = "Catalog Pending Tomorrow";
+      kpiSubtextScope.textContent = "Acer Monitors Portfolio (Excel 1-61)";
     } else if (currentGroup === "other_products") {
       kpiSubtextScope.textContent = "Complete Accessories Portfolio (Excel 1-90)";
     } else {
-      kpiSubtextScope.textContent = "Unified 90-Item Portfolio";
+      kpiSubtextScope.textContent = "Unified 151-Item Portfolio";
     }
   }
 }
@@ -315,14 +315,13 @@ function renderProductsTable(products) {
   tbody.innerHTML = "";
 
   if (products.length === 0) {
-    const isMonitors = currentGroup === "acer_monitors";
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="text-center" style="padding: 48px 20px; color: var(--text-muted);">
-          <i class="fa-solid ${isMonitors ? 'fa-display' : 'fa-box-open'}" style="font-size: 36px; margin-bottom: 12px; display: block; color: var(--color-indigo);"></i>
-          <h4 style="color: var(--text-main); margin-bottom: 6px; font-size: 15px;">${isMonitors ? 'Acer Monitors Catalog Pending' : 'No products found'}</h4>
+          <i class="fa-solid fa-box-open" style="font-size: 36px; margin-bottom: 12px; display: block; color: var(--color-indigo);"></i>
+          <h4 style="color: var(--text-main); margin-bottom: 6px; font-size: 15px;">No products found</h4>
           <p style="max-width: 460px; margin: 0 auto; font-size: 13px; line-height: 1.5;">
-            ${isMonitors ? 'Monitor stands & privacy screens have been moved into the Other Accessories tab. Real Acer Monitors catalog will be uploaded here tomorrow.' : 'No products found matching the current filters.'}
+            No products found matching the current search query or filter selection.
           </p>
         </td>
       </tr>
