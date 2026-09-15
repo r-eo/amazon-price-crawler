@@ -431,11 +431,20 @@ def scrape_asin_details(
 
     final_price = price if price else (existing.get("current_price") if existing else 14999.0)
     final_mrp = mrp if mrp else (existing.get("mrp") if existing else (final_price * 1.25))
-    final_title = title if title else (existing.get("title") if existing else f"Product {asin}")
+    
+    # Preserve verified catalog title format matching Model & Part No
+    final_title = existing.get("title") if (existing and existing.get("title")) else (title or f"Product {asin}")
+    
+    # Prevent Prime badge or low-quality fallback from overwriting verified image
+    if not image_url or "prime" in image_url or "marketing" in image_url or "transparent" in image_url:
+        if existing and existing.get("image_url"):
+            image_url = existing.get("image_url")
 
     updated_product = {
         "asin": asin,
         "title": final_title,
+        "model": existing.get("model") if existing else None,
+        "part_no": existing.get("part_no") if existing else None,
         "category": target_category,
         "product_group": target_group,
         "sort_order": existing.get("sort_order", 999) if existing else 999,
