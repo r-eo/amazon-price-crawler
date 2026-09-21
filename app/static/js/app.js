@@ -404,6 +404,7 @@ function renderProductsTable(products) {
         <span class="badge ${inStock ? 'badge-emerald' : 'badge-red'}">
           ${inStock ? 'In Stock' : 'Unavailable'}
         </span>
+        ${p.seller_name ? `<div style="font-size: 10px; color: var(--color-slate-500); margin-top: 3px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="Seller: ${p.seller_name}">${p.seller_name}</div>` : ''}
       </td>
       <td class="text-center">
         <div class="action-buttons">

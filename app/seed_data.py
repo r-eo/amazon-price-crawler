@@ -935,7 +935,7 @@ ACER_MONITOR_SEED_PRODUCTS = [
         'rating': 3.8,
         'review_count': 64,
         'sort_order': 55,
-        'stock_status': 'In Stock',
+        'stock_status': 'Out of Stock',
         'title': 'Acer SA322QK - 31.5" 4K UHD IPS Monitor (UM.JS2SI.001)',
         'url_slug': 'acer-sa322qk-um-js2si-001',
     },

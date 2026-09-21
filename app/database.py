@@ -49,6 +49,8 @@ def init_db():
             cursor.execute("ALTER TABLE products ADD COLUMN part_no TEXT")
         if "model" not in columns:
             cursor.execute("ALTER TABLE products ADD COLUMN model TEXT")
+        if "seller_name" not in columns:
+            cursor.execute("ALTER TABLE products ADD COLUMN seller_name TEXT")
 
         # Move monitor stands and privacy screens to other_products (accessories)
         cursor.execute("""
@@ -133,16 +135,18 @@ def upsert_product(product_data: Dict[str, Any]):
         product_data["part_no"] = None
     if "model" not in product_data:
         product_data["model"] = None
+    if "seller_name" not in product_data:
+        product_data["seller_name"] = None
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO products (
                 asin, title, model, part_no, category, product_group, sort_order, mrp, current_price, currency,
-                stock_status, rating, review_count, image_url, url, last_scraped_at
+                stock_status, seller_name, rating, review_count, image_url, url, last_scraped_at
             ) VALUES (
                 :asin, :title, :model, :part_no, :category, :product_group, :sort_order, :mrp, :current_price, :currency,
-                :stock_status, :rating, :review_count, :image_url, :url, :last_scraped_at
+                :stock_status, :seller_name, :rating, :review_count, :image_url, :url, :last_scraped_at
             ) ON CONFLICT(asin) DO UPDATE SET
                 title = excluded.title,
                 model = COALESCE(excluded.model, products.model),
@@ -153,6 +157,7 @@ def upsert_product(product_data: Dict[str, Any]):
                 mrp = excluded.mrp,
                 current_price = excluded.current_price,
                 stock_status = excluded.stock_status,
+                seller_name = excluded.seller_name,
                 rating = excluded.rating,
                 review_count = excluded.review_count,
                 image_url = excluded.image_url,

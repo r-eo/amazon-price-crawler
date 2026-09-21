@@ -110,4 +110,22 @@ else:
 # Limit scraper threads to 2 to prevent RAM spikes from concurrent DOM parsers
 SCRAPER_MAX_WORKERS = 2
 
+# Approved Authorized Amazon Vendors (Case-insensitive matching)
+# Only offers from these verified vendors are accepted as "In Stock".
+# Unapproved third-party or scalper sellers will be marked "Out of Stock".
+DEFAULT_APPROVED_VENDORS = [
+    "appario retail",
+    "cocoblu retail",
+    "acer official",
+    "acer india",
+    "dawntech electronics",
+    "amazon retail",
+    "amazon.in"
+]
+_env_vendors = os.getenv("APPROVED_VENDORS")
+if _env_vendors:
+    APPROVED_VENDORS = [v.strip().lower() for v in _env_vendors.split(",") if v.strip()]
+else:
+    APPROVED_VENDORS = DEFAULT_APPROVED_VENDORS
+
 

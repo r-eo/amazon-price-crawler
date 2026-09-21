@@ -10,7 +10,8 @@ from app.config import (
     BASE_AMAZON_URL, DEFAULT_HEADERS,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
     SCRAPER_MAX_WORKERS, now_ist, now_ist_str,
-    SCRAPER_API_KEY, SCRAPERAPI_URL, SCRAPERAPI_COUNTRY, SCRAPERAPI_TIMEOUT
+    SCRAPER_API_KEY, SCRAPERAPI_URL, SCRAPERAPI_COUNTRY, SCRAPERAPI_TIMEOUT,
+    APPROVED_VENDORS
 )
 from app.database import (
     upsert_product, add_price_history_batch, get_product_by_asin,
@@ -22,6 +23,30 @@ from app.history_engine import seed_custom_asin_timeline
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("amazon_scraper")
+
+def extract_seller_name(soup) -> Optional[str]:
+    """Extracts the active winning seller / merchant name from the Amazon page."""
+    seller_el = soup.select_one("#sellerProfileTriggerId")
+    if seller_el and seller_el.get_text().strip():
+        return seller_el.get_text().strip()
+    tabular = soup.select_one('#tabular-buybox .tabular-buybox-text[tabular-attribute-name="Sold by"]')
+    if tabular and tabular.get_text().strip():
+        return tabular.get_text().strip()
+    merchant_info = soup.select_one("#merchant-info")
+    if merchant_info:
+        m_text = merchant_info.get_text().strip()
+        match = re.search(r"sold by\s+([^.\n\r]+?)(?:\s+and\s+fulfilled|\s+and\s+ships|\.|$)", m_text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        if m_text and len(m_text) < 80:
+            return m_text
+    mob_seller = soup.select_one("#shipsFromSoldBy_feature_div, #shipsFromSoldByInsideBuyBox_feature_div")
+    if mob_seller:
+        m_text = mob_seller.get_text().strip()
+        match = re.search(r"sold by\s+([^.\n\r]+?)(?:\s+and|\.|$)", m_text, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    return None
 
 def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
     """Returns baseline metadata from verified seed catalog if database record is missing."""
@@ -316,9 +341,11 @@ def scrape_asin_details(
     elif existing:
         title = existing.get("title")
 
-    # 2. Main Product Container & Out-of-Stock Detection
+    # 2. Main Product Container, Seller Identification & Out-of-Stock Detection
     center_col = soup.select_one("#centerCol") or soup.select_one("#desktop_buybox") or soup.select_one("#apex_desktop") or soup.select_one("#ppd")
     
+    seller_name = extract_seller_name(soup)
+
     stock_status = "In Stock"
     avail_blocks = [
         soup.select_one("#availability"),
@@ -334,6 +361,20 @@ def scrape_asin_details(
                 break
             elif "left in stock" in txt:
                 stock_status = ab.get_text().strip()
+
+    # Vendor Emulation & Authorization Check:
+    # If the product appears in stock, verify whether the winning seller is an approved vendor
+    if stock_status != "Out of Stock":
+        if seller_name:
+            is_approved = any(v in seller_name.lower() for v in APPROVED_VENDORS)
+            if not is_approved:
+                logger.info(f"ASIN {asin}: Sold by unapproved seller '{seller_name}'. Policy: Marking Out of Stock.")
+                stock_status = "Out of Stock"
+        else:
+            # If no seller could be determined from buybox, verify an active purchase action exists
+            has_buybox = bool(soup.select_one("#add-to-cart-button, #buy-now-button"))
+            if not has_buybox:
+                stock_status = "Out of Stock"
 
     # 3. Live Price Extraction
     price = None
@@ -621,6 +662,7 @@ def scrape_asin_details(
         "current_price": final_price,
         "currency": existing.get("currency", "INR") if existing else "INR",
         "stock_status": stock_status,
+        "seller_name": seller_name,
         "rating": rating,
         "review_count": review_count,
         "image_url": image_url,
