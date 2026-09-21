@@ -2,6 +2,13 @@ import os
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+# Load environment variables from .env if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Indian Standard Time (IST) definitions
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -76,8 +83,28 @@ EXCEL_MONITORS_FILENAME = "Acer_Monitors_Price_Tracker.xlsx"
 EXCEL_OTHER_FILENAME = "Other_Products_Price_Tracker.xlsx"
 EXCEL_ALL_FILENAME = "All_Products_Price_Tracker.xlsx"
 
-# Automated Daily Crawl Schedule: Once every 2 hours in IST (9 AM, 11 AM, 1 PM, 3 PM, 5 PM, 7 PM, 9 PM)
-SYNC_INTERVAL_HOURS = [9, 11, 13, 15, 17, 19, 21]
+# ScraperAPI Settings (Residential proxy rotation to bypass Amazon bot blocks)
+SCRAPER_API_KEY = (
+    os.getenv("SCRAPER_API") or
+    os.getenv("SCRAPERAPI_KEY") or
+    os.getenv("SCRAPER_API_KEY") or
+    ""
+).strip("\"' \t\r\n")
+
+SCRAPERAPI_URL = "https://api.scraperapi.com"
+SCRAPERAPI_COUNTRY = os.getenv("SCRAPERAPI_COUNTRY", "in")
+SCRAPERAPI_TIMEOUT = int(os.getenv("SCRAPERAPI_TIMEOUT", "50"))
+
+# Automated Crawl Schedule (IST hours):
+# Default: 10 AM IST daily (conserves API credits for 30 days continuous operation within free tier)
+# Can be overridden via SYNC_HOURS env var (e.g. "9,11,13,15,17,19,21" or "10")
+_env_sync_hours = os.getenv("SYNC_HOURS")
+if _env_sync_hours:
+    SYNC_INTERVAL_HOURS = [int(h.strip()) for h in _env_sync_hours.split(",") if h.strip().isdigit()]
+elif SCRAPER_API_KEY:
+    SYNC_INTERVAL_HOURS = [10]  # 10:00 AM IST daily (~4,500 credits/mo, safely within 5,000 free tier)
+else:
+    SYNC_INTERVAL_HOURS = [9, 11, 13, 15, 17, 19, 21]
 
 # Render Free Tier Memory Optimization (256MB RAM):
 # Limit scraper threads to 2 to prevent RAM spikes from concurrent DOM parsers

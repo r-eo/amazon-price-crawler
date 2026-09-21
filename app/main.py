@@ -70,8 +70,9 @@ async def scheduled_sync_loop():
 
             try:
                 logger.info(f"Executing scheduled {target_time.strftime('%I:%M %p IST')} crawl & Excel generation...")
-                # Crawl accessories catalog (all 90 items)
-                await asyncio.to_thread(scrape_all_asins, GROUP_OTHER_PRODUCTS)
+                # Crawl catalog (full portfolio on daily schedule, or accessories on high-frequency schedule)
+                target_sync_group = GROUP_ALL if len(SYNC_INTERVAL_HOURS) <= 2 else GROUP_OTHER_PRODUCTS
+                await asyncio.to_thread(scrape_all_asins, target_sync_group)
                 gc.collect()
                 # Sequentially generate Excel workbooks to conserve memory
                 await asyncio.to_thread(export_other_products_excel)
@@ -162,9 +163,10 @@ def scheduler_status():
     
     formatted_time = target_time.strftime("%I:%M %p IST").lstrip("0")
     intervals_display = [datetime.strptime(str(h), "%H").strftime("%I:%M %p IST").lstrip("0") for h in sorted(SYNC_INTERVAL_HOURS)]
-    
+    schedule_label = f"Daily at {intervals_display[0]}" if len(SYNC_INTERVAL_HOURS) == 1 else f"Every {24 // max(1, len(SYNC_INTERVAL_HOURS))} Hours (IST)"
+
     return {
-        "schedule_type": "Every 2 Hours (IST)",
+        "schedule_type": schedule_label,
         "intervals": intervals_display,
         "next_run_at": target_time.strftime("%Y-%m-%d %H:%M:%S IST"),
         "next_time_display": formatted_time,

@@ -9,7 +9,8 @@ from bs4 import BeautifulSoup
 from app.config import (
     BASE_AMAZON_URL, DEFAULT_HEADERS,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
-    SCRAPER_MAX_WORKERS, now_ist, now_ist_str
+    SCRAPER_MAX_WORKERS, now_ist, now_ist_str,
+    SCRAPER_API_KEY, SCRAPERAPI_URL, SCRAPERAPI_COUNTRY, SCRAPERAPI_TIMEOUT
 )
 from app.database import (
     upsert_product, add_price_history_batch, get_product_by_asin,
@@ -141,15 +142,47 @@ def _extract_json_ld_price(soup) -> Optional[float]:
 
 def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
     """
-    Fetches HTML content using curl_cffi with Chrome TLS impersonation,
-    Indian locale cookies, and automatic mobile fallback (/gp/aw/d/{asin}) if CAPTCHA is met.
+    Fetches HTML content from Amazon.
+    If SCRAPER_API_KEY is configured:
+      Routes the request through ScraperAPI Indian residential proxies with Indian locale cookies,
+      completely bypassing Amazon datacenter IP blocks & CAPTCHAs.
+    Otherwise (or if ScraperAPI fails):
+      Falls back to curl_cffi with Chrome TLS impersonation, mobile web fallback (/gp/aw/d/{asin}),
+      and standard requests.
     """
     cookies = {
         "i18n-prefs": "INR",
         "lc-acbin": "en_IN",
     }
 
-    # 1. Primary Attempt: Standard /dp/ URL with Chrome impersonation
+    # 0. Primary Attempt: ScraperAPI Residential Proxy (Essential for Render / Cloud hosting)
+    if SCRAPER_API_KEY:
+        try:
+            import requests
+            scraper_params = {
+                "api_key": SCRAPER_API_KEY,
+                "url": url,
+                "country_code": SCRAPERAPI_COUNTRY,
+                "keep_headers": "true"
+            }
+            scraper_headers = {
+                "Cookie": "i18n-prefs=INR; lc-acbin=en_IN;",
+                "Accept-Language": "en-IN,en;q=0.9",
+            }
+            resp = requests.get(
+                SCRAPERAPI_URL,
+                params=scraper_params,
+                headers=scraper_headers,
+                timeout=SCRAPERAPI_TIMEOUT
+            )
+            if resp.status_code == 200 and "Type the characters you see in this image" not in resp.text:
+                logger.info(f"ScraperAPI residential fetch succeeded for ASIN {asin or url}.")
+                return resp.text
+            logger.warning(f"ScraperAPI returned status {resp.status_code} for {url}, falling back to direct fetch...")
+        except Exception as e:
+            logger.warning(f"ScraperAPI fetch failed ({e}) for {url}, falling back to direct fetch...")
+
+    # 1. Direct Attempt: Standard /dp/ URL with Chrome impersonation
     try:
         from curl_cffi import requests as curl_requests
         response = curl_requests.get(
