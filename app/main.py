@@ -146,6 +146,9 @@ def health_check():
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
+    favicon_path = STATIC_DIR / "favicon.svg"
+    if favicon_path.exists():
+        return FileResponse(str(favicon_path), media_type="image/svg+xml")
     return Response(content=b"", media_type="image/x-icon")
 
 @app.get("/api/scheduler/status")

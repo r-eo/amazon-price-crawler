@@ -48,15 +48,96 @@ def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
     return None
 
 def parse_price(price_str: Optional[str]) -> Optional[float]:
-    """Cleans and extracts a numeric price float from an Amazon price string."""
+    """Cleans and extracts a numeric price float from an Amazon price string.
+    Handles Indian number formatting (₹1,29,999.00), stray dots, trailing commas,
+    and whitespace/newlines injected by Amazon's DOM rendering.
+    """
     if not price_str:
         return None
-    cleaned = re.sub(r"[^\d.]", "", price_str.strip())
+    text = price_str.strip()
+    # Remove currency symbols, whitespace, and non-numeric chars except digits, dots, commas
+    text = re.sub(r'[₹$€£\s\xa0]', '', text)
+    # Remove commas used as thousands separators (Indian: 1,29,999 or Western: 129,999)
+    text = text.replace(',', '')
+    # Handle multiple dots — keep only the last one as decimal point
+    parts = text.split('.')
+    if len(parts) > 2:
+        text = ''.join(parts[:-1]) + '.' + parts[-1]
+    # Remove any remaining non-numeric chars except the decimal dot
+    text = re.sub(r'[^\d.]', '', text)
+    # Strip trailing dot (e.g. "12999.")
+    text = text.rstrip('.')
+    if not text:
+        return None
     try:
-        val = float(cleaned)
+        val = float(text)
         return val if val > 0 else None
     except ValueError:
         return None
+
+def _extract_complete_price_from_element(elem) -> Optional[float]:
+    """Extracts a complete price from an .a-price element by combining
+    .a-price-whole and .a-price-fraction, or using .a-offscreen as the clean source.
+    """
+    if not elem:
+        return None
+    # Best: .a-offscreen contains the full formatted price string (e.g. "₹12,999.00")
+    offscreen = elem.select_one('span.a-offscreen')
+    if offscreen:
+        val = parse_price(offscreen.get_text())
+        if val and val > 0:
+            return val
+    # Fallback: combine .a-price-whole + .a-price-fraction
+    whole_el = elem.select_one('.a-price-whole')
+    if whole_el:
+        whole_text = whole_el.get_text().strip().rstrip('.')
+        frac_el = elem.select_one('.a-price-fraction')
+        frac_text = frac_el.get_text().strip() if frac_el else '00'
+        combined = f"{whole_text}.{frac_text}"
+        val = parse_price(combined)
+        if val and val > 0:
+            return val
+    return None
+
+def _extract_json_ld_price(soup) -> Optional[float]:
+    """Extracts product price from JSON-LD structured data embedded in the page.
+    This is the most stable source — Amazon serves it for SEO/accessibility.
+    """
+    import json
+    for script in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(script.string or '')
+            # Handle both single object and array of objects
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if item.get('@type') == 'Product':
+                    offers = item.get('offers', {})
+                    # 'offers' can be a single Offer or AggregateOffer
+                    if isinstance(offers, list):
+                        prices = []
+                        for o in offers:
+                            p = o.get('price') or o.get('lowPrice')
+                            if p:
+                                try:
+                                    prices.append(float(p))
+                                except (ValueError, TypeError):
+                                    pass
+                        if prices:
+                            return min(p for p in prices if p > 0)
+                    elif isinstance(offers, dict):
+                        # AggregateOffer has lowPrice; Offer has price
+                        for key in ('lowPrice', 'price'):
+                            p = offers.get(key)
+                            if p:
+                                try:
+                                    pf = float(p)
+                                    if pf > 0:
+                                        return pf
+                                except (ValueError, TypeError):
+                                    pass
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            continue
+    return None
 
 def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
     """
@@ -224,34 +305,58 @@ def scrape_asin_details(
     # 3. Live Price Extraction
     price = None
     if stock_status != "Out of Stock":
-        # Priority 0: Twister Plus Structured Buying Options (Official Amazon JSON for lowest available offer)
+        import json as _json
+
+        # Priority 0: JSON-LD Structured Data (most stable — Amazon serves this for SEO)
+        jsonld_price = _extract_json_ld_price(soup)
+
+        # Priority 1: Twister Plus Structured Buying Options (embedded JSON)
         twister_price = None
         twister = soup.select_one(".twister-plus-buying-options-price-data, [data-twister-buying-options]")
         if twister:
             try:
-                import json
-                t_data = json.loads(twister.get_text())
+                t_data = _json.loads(twister.get_text())
                 t_prices = []
-                for k, opts in t_data.items():
-                    if isinstance(opts, list):
-                        for o in opts:
-                            p_val = o.get("priceAmount")
-                            if p_val and float(p_val) > 0:
-                                t_prices.append(float(p_val))
+                # Handle all known twister data structures:
+                # Structure A: {"key": [{"priceAmount": X}, ...]}
+                # Structure B: [{"priceAmount": X}, ...]
+                # Structure C: {"key": {"priceAmount": X}}
+                def _collect_twister_prices(obj):
+                    if isinstance(obj, dict):
+                        pa = obj.get("priceAmount")
+                        if pa:
+                            try:
+                                pf = float(pa)
+                                if pf > 0:
+                                    t_prices.append(pf)
+                            except (ValueError, TypeError):
+                                pass
+                        for v in obj.values():
+                            _collect_twister_prices(v)
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            _collect_twister_prices(item)
+                _collect_twister_prices(t_data)
                 if t_prices:
                     twister_price = min(t_prices)
             except Exception:
                 pass
 
         # Check total price and subtotal widgets
-        for tp_sel in ["#tp_price_block_total_price_ww .a-offscreen", "#tp-tool-tip-subtotal-price-value .a-offscreen", "#tp_price_block_total_price_ww .a-price-whole"]:
+        for tp_sel in ["#tp_price_block_total_price_ww .a-offscreen", "#tp-tool-tip-subtotal-price-value .a-offscreen"]:
             tp_elem = soup.select_one(tp_sel)
             if tp_elem:
                 tp_val = parse_price(tp_elem.get_text())
                 if tp_val and tp_val > 0:
                     twister_price = min(twister_price, tp_val) if twister_price else tp_val
+        # Also check the total price block's .a-price element for complete price
+        tp_price_block = soup.select_one("#tp_price_block_total_price_ww .a-price")
+        if tp_price_block:
+            tp_val = _extract_complete_price_from_element(tp_price_block)
+            if tp_val and tp_val > 0:
+                twister_price = min(twister_price, tp_val) if twister_price else tp_val
 
-        # Priority 1: Check hidden buybox price input
+        # Priority 2: Hidden buybox price input (canonical customerVisiblePrice)
         buybox_price = None
         buybox = soup.select_one("#desktop_buybox") or soup.select_one("#buybox")
         if buybox:
@@ -264,7 +369,7 @@ def scrape_asin_details(
                 except ValueError:
                     pass
 
-        # Priority 2: Target specific buybox/core price blocks
+        # Priority 3: CSS selectors within buybox/core price blocks
         if not buybox_price:
             target_blocks = [
                 soup.select_one("#corePriceDisplay_desktop_feature_div"),
@@ -274,23 +379,25 @@ def scrape_asin_details(
                 soup.select_one("#buybox"),
                 center_col
             ]
-            
-            price_selectors = [
+
+            # Selectors using .a-offscreen (complete formatted price — most reliable CSS approach)
+            offscreen_selectors = [
                 ".priceToPay span.a-offscreen",
                 ".apexPriceToPay span.a-offscreen",
-                ".reinventPricePriceToPayMargin .a-price-whole",
-                ".priceToPay .a-price-whole",
-                ".apexPriceToPay .a-price-whole",
+                ".reinventPricePriceToPayMargin span.a-offscreen",
                 "#priceblock_dealprice",
                 "#priceblock_ourprice",
                 "#priceblock_saleprice",
-                ".a-price:not(.a-text-price) span.a-offscreen",
                 "span.apex-pricetopay-value",
+                # Mobile page selectors (when mobile fallback is used)
+                "#price_inside_buybox",
+                "#newBuyBoxPrice",
+                ".a-color-price",
             ]
             for block in target_blocks:
                 if not block:
                     continue
-                for sel in price_selectors:
+                for sel in offscreen_selectors:
                     elem = block.select_one(sel)
                     if elem:
                         val = parse_price(elem.get_text())
@@ -300,42 +407,71 @@ def scrape_asin_details(
                 if buybox_price:
                     break
 
-        # Priority 3: Check All Offers Display / Other Sellers Ingress (Lowest available deal offer)
-        aod_price = None
-        for aod_sel in [
-            "#aod-ingress-link .a-offscreen",
-            "#aod-ingress-link .a-price-whole",
-            "#all-offers-display .a-offscreen",
-            "#all-offers-display .a-price-whole",
-            "#olp_feature_div .a-offscreen",
-            "#dynamic-aod-ingress-box .a-offscreen"
-        ]:
-            aod_elem = soup.select_one(aod_sel)
-            if aod_elem:
-                val = parse_price(aod_elem.get_text())
-                if val and val > 0:
-                    aod_price = min(aod_price, val) if aod_price else val
+            # If offscreen selectors failed, try .a-price elements with combined whole+fraction
+            if not buybox_price:
+                for block in target_blocks:
+                    if not block:
+                        continue
+                    # Find the first non-strikethrough .a-price element
+                    for a_price_el in block.select('.a-price:not(.a-text-price)'):
+                        val = _extract_complete_price_from_element(a_price_el)
+                        if val and val > 0:
+                            buybox_price = val
+                            break
+                    if buybox_price:
+                        break
 
-        # Always take the lowest verified selling price available on the product page
-        candidates = [p for p in [twister_price, aod_price, buybox_price] if p and p > 0]
-        if candidates:
-            price = min(candidates)
+        # Priority 4: AOD (All Offers Display) — ONLY as fallback if no buybox price
+        # AOD may contain used/renewed/third-party prices, so we don't min() it with buybox.
+        aod_price = None
+        if not buybox_price and not twister_price and not jsonld_price:
+            for aod_sel in [
+                "#aod-ingress-link .a-offscreen",
+                "#all-offers-display .a-offscreen",
+                "#olp_feature_div .a-offscreen",
+                "#dynamic-aod-ingress-box .a-offscreen"
+            ]:
+                aod_elem = soup.select_one(aod_sel)
+                if aod_elem:
+                    val = parse_price(aod_elem.get_text())
+                    if val and val > 0:
+                        aod_price = val
+                        break  # Take first valid, not min — AOD can mix conditions
+
+        # Final price selection: Prefer buybox > twister > JSON-LD > AOD
+        # Buybox/twister are the displayed price; JSON-LD is stable; AOD is last resort
+        if buybox_price and buybox_price > 0:
+            price = buybox_price
+        elif twister_price and twister_price > 0:
+            price = twister_price
+        elif jsonld_price and jsonld_price > 0:
+            price = jsonld_price
+        elif aod_price and aod_price > 0:
+            price = aod_price
 
     # 4. MRP Extraction (Strictly within center_col / main area)
     mrp = custom_mrp
     if not mrp and center_col:
-        mrp_selectors = [
+        # First try .a-offscreen selectors (complete MRP values)
+        mrp_offscreen_selectors = [
             ".apex-basisprice-value .a-offscreen",
             ".basisPrice .a-offscreen",
             "span.a-price.a-text-price .a-offscreen",
             "#corePrice_desktop .a-text-price .a-offscreen",
-            ".apex-basisprice-value",
-            ".basisPrice .a-price-whole"
+            "#corePriceDisplay_desktop_feature_div .a-text-price .a-offscreen",
+            "#corePrice_feature_div .a-text-price .a-offscreen",
         ]
-        for sel in mrp_selectors:
+        for sel in mrp_offscreen_selectors:
             elem = center_col.select_one(sel)
             if elem:
                 extracted = parse_price(elem.get_text())
+                if extracted and extracted > 0:
+                    mrp = extracted
+                    break
+        # If offscreen failed, try extracting from .a-text-price elements (strikethrough prices = MRP)
+        if not mrp:
+            for mrp_el in center_col.select('span.a-price.a-text-price'):
+                extracted = _extract_complete_price_from_element(mrp_el)
                 if extracted and extracted > 0:
                     mrp = extracted
                     break
