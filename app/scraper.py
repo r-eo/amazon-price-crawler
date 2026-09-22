@@ -2,6 +2,7 @@ import re
 import time
 import gc
 import logging
+import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from bs4 import BeautifulSoup
@@ -10,7 +11,7 @@ from app.config import (
     BASE_AMAZON_URL, DEFAULT_HEADERS,
     GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL,
     SCRAPER_MAX_WORKERS, now_ist, now_ist_str,
-    SCRAPER_API_KEY, SCRAPERAPI_URL, SCRAPERAPI_COUNTRY, SCRAPERAPI_TIMEOUT,
+    SCRAPER_API_KEYS, SCRAPER_API_KEY, SCRAPERAPI_URL, SCRAPERAPI_COUNTRY, SCRAPERAPI_TIMEOUT,
     APPROVED_VENDORS
 )
 from app.database import (
@@ -23,6 +24,21 @@ from app.history_engine import seed_custom_asin_timeline
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("amazon_scraper")
+
+# Thread-safe round-robin ScraperAPI key selector
+_scraper_key_lock = threading.Lock()
+_scraper_key_idx = 0
+
+def get_ordered_scraper_keys() -> List[str]:
+    """Returns all ScraperAPI keys starting with the next round-robin key, for load-balancing and failover."""
+    global _scraper_key_idx
+    pool = [k for k in SCRAPER_API_KEYS if k]
+    if not pool:
+        return [SCRAPER_API_KEY] if SCRAPER_API_KEY else []
+    with _scraper_key_lock:
+        start_idx = _scraper_key_idx % len(pool)
+        _scraper_key_idx += 1
+    return pool[start_idx:] + pool[:start_idx]
 
 def extract_seller_name(soup) -> Optional[str]:
     """Extracts the active winning seller / merchant name from the Amazon page."""
@@ -64,7 +80,7 @@ def get_seed_fallback(asin: str) -> Optional[Dict[str, Any]]:
                 "mrp": p["mrp"],
                 "current_price": p["base_price"],
                 "currency": "INR",
-                "stock_status": "In Stock",
+                "stock_status": p.get("stock_status", "In Stock"),
                 "rating": p.get("rating", 4.2),
                 "review_count": p.get("review_count", 100),
                 "image_url": p.get("image_url"),
@@ -180,32 +196,43 @@ def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
         "lc-acbin": "en_IN",
     }
 
-    # 0. Primary Attempt: ScraperAPI Residential Proxy (Essential for Render / Cloud hosting)
-    if SCRAPER_API_KEY:
-        try:
-            import requests
-            scraper_params = {
-                "api_key": SCRAPER_API_KEY,
-                "url": url,
-                "country_code": SCRAPERAPI_COUNTRY,
-                "keep_headers": "true"
-            }
-            scraper_headers = {
-                "Cookie": "i18n-prefs=INR; lc-acbin=en_IN;",
-                "Accept-Language": "en-IN,en;q=0.9",
-            }
-            resp = requests.get(
-                SCRAPERAPI_URL,
-                params=scraper_params,
-                headers=scraper_headers,
-                timeout=SCRAPERAPI_TIMEOUT
-            )
-            if resp.status_code == 200 and "Type the characters you see in this image" not in resp.text:
-                logger.info(f"ScraperAPI residential fetch succeeded for ASIN {asin or url}.")
-                return resp.text
-            logger.warning(f"ScraperAPI returned status {resp.status_code} for {url}, falling back to direct fetch...")
-        except Exception as e:
-            logger.warning(f"ScraperAPI fetch failed ({e}) for {url}, falling back to direct fetch...")
+    # 0. Primary Attempt: ScraperAPI Residential Proxy Pool with automatic failover
+    keys_to_try = get_ordered_scraper_keys()
+    if keys_to_try:
+        import requests
+        for k_idx, key in enumerate(keys_to_try):
+            masked_key = f"{key[:6]}...{key[-4:]}"
+            try:
+                scraper_params = {
+                    "api_key": key,
+                    "url": url,
+                    "country_code": SCRAPERAPI_COUNTRY,
+                    "keep_headers": "true"
+                }
+                scraper_headers = {
+                    "Cookie": "i18n-prefs=INR; lc-acbin=en_IN;",
+                    "Accept-Language": "en-IN,en;q=0.9",
+                }
+                resp = requests.get(
+                    SCRAPERAPI_URL,
+                    params=scraper_params,
+                    headers=scraper_headers,
+                    timeout=SCRAPERAPI_TIMEOUT
+                )
+                if resp.status_code == 200 and "Type the characters you see in this image" not in resp.text:
+                    logger.info(f"ScraperAPI residential fetch succeeded for ASIN {asin or url} via key {masked_key}.")
+                    return resp.text
+                elif resp.status_code == 404:
+                    logger.info(f"ASIN {asin or url} returned 404 Not Found from Amazon via ScraperAPI.")
+                    return "404_NOT_FOUND"
+                elif resp.status_code in (401, 403, 429):
+                    logger.warning(f"ScraperAPI key {masked_key} returned status {resp.status_code}. Failing over to next key ({k_idx+1}/{len(keys_to_try)})...")
+                    continue
+                else:
+                    logger.warning(f"ScraperAPI returned status {resp.status_code} for {url} via key {masked_key}.")
+            except Exception as e:
+                logger.warning(f"ScraperAPI fetch failed ({e}) for {url} via key {masked_key}. Trying next key...")
+                continue
 
     # 1. Direct Attempt: Standard /dp/ URL with Chrome impersonation
     try:
@@ -220,6 +247,8 @@ def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
         )
         if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
             return response.text
+        if response.status_code == 404:
+            return "404_NOT_FOUND"
         logger.warning(f"curl_cffi primary attempt for {url} returned status {response.status_code} or CAPTCHA.")
     except Exception as e:
         logger.warning(f"curl_cffi primary fetch failed ({e}), trying fallback...")
@@ -245,6 +274,8 @@ def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
             if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
                 logger.info(f"Mobile web fallback succeeded for ASIN {asin}.")
                 return response.text
+            if response.status_code == 404:
+                return "404_NOT_FOUND"
         except Exception as e:
             logger.warning(f"Mobile fallback failed ({e}) for ASIN {asin}.")
 
@@ -256,6 +287,8 @@ def fetch_page_content(url: str, asin: Optional[str] = None) -> Optional[str]:
         response = session.get(url, cookies=cookies, timeout=15)
         if response.status_code == 200 and "Type the characters you see in this image" not in response.text:
             return response.text
+        if response.status_code == 404:
+            return "404_NOT_FOUND"
     except Exception as e:
         logger.error(f"All fetch attempts failed for {url}: {e}")
 
@@ -280,6 +313,27 @@ def scrape_asin_details(
     # Existing product in DB or fallback
     existing = get_product_by_asin(asin) or get_seed_fallback(asin)
     prev_price = existing.get("current_price") if existing else None
+
+    # Handle delisted / 404 products immediately
+    if html == "404_NOT_FOUND":
+        logger.info(f"ASIN {asin}: Page is delisted or 404 on Amazon. Updating as Out of Stock.")
+        if existing:
+            updated_product = dict(existing)
+            updated_product["stock_status"] = "Out of Stock"
+            updated_product["last_scraped_at"] = now_str
+            upsert_product(updated_product)
+            return {
+                "asin": asin,
+                "success": True,
+                "price_changed": False,
+                "price_dropped": False,
+                "previous_price": prev_price,
+                "new_price": prev_price,
+                "change_info": None,
+                "drop_info": None,
+                "message": f"Product {asin} is delisted/unavailable on Amazon. Marked Out of Stock.",
+                "data": updated_product
+            }
     
     if not html:
         logger.warning(f"Could not retrieve HTML for ASIN {asin}, maintaining database state.")
@@ -351,7 +405,8 @@ def scrape_asin_details(
         soup.select_one("#availability"),
         soup.select_one("#outOfStock"),
         soup.select_one("#outOfStockBuyBox_feature_div"),
-        soup.select_one("#availabilityInsideBuyBox_feature_div")
+        soup.select_one("#availabilityInsideBuyBox_feature_div"),
+        soup.select_one("#shipsFromSoldByInsideBuyBox_feature_div")
     ]
     for ab in avail_blocks:
         if ab:
@@ -359,79 +414,96 @@ def scrape_asin_details(
             if "currently unavailable" in txt or "out of stock" in txt or "we don't know when or if" in txt or "temporarily out of stock" in txt:
                 stock_status = "Out of Stock"
                 break
-            elif "left in stock" in txt:
-                stock_status = ab.get_text().strip()
+            elif "left in stock" in txt or "in stock" in txt:
+                stock_status = "In Stock"
 
-    # Vendor Emulation & Authorization Check:
-    # If the product appears in stock, verify whether the winning seller is an approved vendor
+    # Check buybox container text directly for out-of-stock signals
+    buybox_container = soup.select_one("#desktop_buybox, #buybox, #mobile_buybox")
+    if buybox_container and stock_status != "Out of Stock":
+        bb_txt = buybox_container.get_text().lower()
+        if "currently unavailable" in bb_txt or "we don't know when or if this item will be back in stock" in bb_txt:
+            stock_status = "Out of Stock"
+
+    # Verify an active purchase button exists in the buybox
+    has_buybox_button = bool(soup.select_one(
+        "#add-to-cart-button:not([disabled]), #buy-now-button:not([disabled]), "
+        "input[name='submit.add-to-cart']:not([disabled]), #addToCart, #turbo-checkout-pyo-button, "
+        "input#add-to-cart-button, input#buy-now-button"
+    ))
+    unqualified = bool(soup.select_one("#unqualifiedBuyBox, #outOfStockBuyBox_feature_div"))
+
     if stock_status != "Out of Stock":
-        if seller_name:
-            is_approved = any(v in seller_name.lower() for v in APPROVED_VENDORS)
-            if not is_approved:
-                logger.info(f"ASIN {asin}: Sold by unapproved seller '{seller_name}'. Policy: Marking Out of Stock.")
+        if unqualified and not has_buybox_button:
+            is_explicitly_unavailable = any(
+                any(neg in (ab.get_text().lower() if ab else "") for neg in ["currently unavailable", "out of stock", "we don't know"])
+                for ab in avail_blocks
+            )
+            if is_explicitly_unavailable:
                 stock_status = "Out of Stock"
-        else:
-            # If no seller could be determined from buybox, verify an active purchase action exists
-            has_buybox = bool(soup.select_one("#add-to-cart-button, #buy-now-button"))
-            if not has_buybox:
+        elif not has_buybox_button:
+            is_explicitly_unavailable = any(
+                any(neg in (ab.get_text().lower() if ab else "") for neg in ["currently unavailable", "out of stock", "we don't know"])
+                for ab in avail_blocks
+            )
+            if is_explicitly_unavailable:
                 stock_status = "Out of Stock"
 
-    # 3. Live Price Extraction
+    # 3. Live Price Extraction (Strictly prioritizing the current ASIN's displayed buybox price)
     price = None
-    if stock_status != "Out of Stock":
-        import json as _json
 
-        # Priority 0: JSON-LD Structured Data (most stable — Amazon serves this for SEO)
-        jsonld_price = _extract_json_ld_price(soup)
+    # Priority 1: Primary Desktop & Mobile Buybox Price Display
+    buybox_price = None
+    target_blocks = [
+        soup.select_one("#corePriceDisplay_desktop_feature_div"),
+        soup.select_one("#corePrice_desktop"),
+        soup.select_one("#corePrice_feature_div"),
+        soup.select_one("#apex_desktop"),
+        soup.select_one("#desktop_buybox"),
+        soup.select_one("#buybox"),
+        center_col
+    ]
 
-        # Priority 1: Twister Plus Structured Buying Options (embedded JSON)
-        twister_price = None
-        twister = soup.select_one(".twister-plus-buying-options-price-data, [data-twister-buying-options]")
-        if twister:
-            try:
-                t_data = _json.loads(twister.get_text())
-                t_prices = []
-                # Handle all known twister data structures:
-                # Structure A: {"key": [{"priceAmount": X}, ...]}
-                # Structure B: [{"priceAmount": X}, ...]
-                # Structure C: {"key": {"priceAmount": X}}
-                def _collect_twister_prices(obj):
-                    if isinstance(obj, dict):
-                        pa = obj.get("priceAmount")
-                        if pa:
-                            try:
-                                pf = float(pa)
-                                if pf > 0:
-                                    t_prices.append(pf)
-                            except (ValueError, TypeError):
-                                pass
-                        for v in obj.values():
-                            _collect_twister_prices(v)
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            _collect_twister_prices(item)
-                _collect_twister_prices(t_data)
-                if t_prices:
-                    twister_price = min(t_prices)
-            except Exception:
-                pass
+    # Selectors using .a-offscreen within primary price block (canonical visible price)
+    offscreen_selectors = [
+        ".priceToPay span.a-offscreen",
+        ".apexPriceToPay span.a-offscreen",
+        ".reinventPricePriceToPayMargin span.a-offscreen",
+        "#priceblock_dealprice",
+        "#priceblock_ourprice",
+        "#priceblock_saleprice",
+        "span.apex-pricetopay-value",
+        "#price_inside_buybox",
+        "#newBuyBoxPrice",
+        ".a-color-price",
+    ]
+    for block in target_blocks:
+        if not block:
+            continue
+        for sel in offscreen_selectors:
+            elem = block.select_one(sel)
+            if elem:
+                val = parse_price(elem.get_text())
+                if val and val > 0:
+                    buybox_price = val
+                    break
+        if buybox_price:
+            break
 
-        # Check total price and subtotal widgets
-        for tp_sel in ["#tp_price_block_total_price_ww .a-offscreen", "#tp-tool-tip-subtotal-price-value .a-offscreen"]:
-            tp_elem = soup.select_one(tp_sel)
-            if tp_elem:
-                tp_val = parse_price(tp_elem.get_text())
-                if tp_val and tp_val > 0:
-                    twister_price = min(twister_price, tp_val) if twister_price else tp_val
-        # Also check the total price block's .a-price element for complete price
-        tp_price_block = soup.select_one("#tp_price_block_total_price_ww .a-price")
-        if tp_price_block:
-            tp_val = _extract_complete_price_from_element(tp_price_block)
-            if tp_val and tp_val > 0:
-                twister_price = min(twister_price, tp_val) if twister_price else tp_val
+    # If offscreen selectors didn't match, extract from .priceToPay / .apexPriceToPay elements
+    if not buybox_price:
+        for block in target_blocks:
+            if not block:
+                continue
+            for a_price_el in block.select('.priceToPay, .apexPriceToPay, .reinventPricePriceToPayMargin, .a-price:not(.a-text-price)'):
+                val = _extract_complete_price_from_element(a_price_el)
+                if val and val > 0:
+                    buybox_price = val
+                    break
+            if buybox_price:
+                break
 
-        # Priority 2: Hidden buybox price input (canonical customerVisiblePrice)
-        buybox_price = None
+    # Check hidden buybox price input (canonical customerVisiblePrice)
+    if not buybox_price:
         buybox = soup.select_one("#desktop_buybox") or soup.select_one("#buybox")
         if buybox:
             hidden_price_elem = buybox.select_one('input[name*="customerVisiblePrice"][name*="amount"]')
@@ -443,90 +515,62 @@ def scrape_asin_details(
                 except ValueError:
                     pass
 
-        # Priority 3: CSS selectors within buybox/core price blocks
-        if not buybox_price:
-            target_blocks = [
-                soup.select_one("#corePriceDisplay_desktop_feature_div"),
-                soup.select_one("#corePrice_feature_div"),
-                soup.select_one("#apex_desktop"),
-                soup.select_one("#desktop_buybox"),
-                soup.select_one("#buybox"),
-                center_col
-            ]
+    # Priority 2: JSON-LD Structured Data (Only if direct buybox price was not found)
+    jsonld_price = None
+    if not buybox_price:
+        jsonld_price = _extract_json_ld_price(soup)
 
-            # Selectors using .a-offscreen (complete formatted price — most reliable CSS approach)
-            offscreen_selectors = [
-                ".priceToPay span.a-offscreen",
-                ".apexPriceToPay span.a-offscreen",
-                ".reinventPricePriceToPayMargin span.a-offscreen",
-                "#priceblock_dealprice",
-                "#priceblock_ourprice",
-                "#priceblock_saleprice",
-                "span.apex-pricetopay-value",
-                # Mobile page selectors (when mobile fallback is used)
-                "#price_inside_buybox",
-                "#newBuyBoxPrice",
-                ".a-color-price",
-            ]
-            for block in target_blocks:
-                if not block:
-                    continue
-                for sel in offscreen_selectors:
-                    elem = block.select_one(sel)
-                    if elem:
-                        val = parse_price(elem.get_text())
-                        if val and val > 0:
-                            buybox_price = val
-                            break
-                if buybox_price:
+    # Priority 3: Twister structured buying options (ONLY if exact ASIN match, avoiding multi-variant min() bleed)
+    twister_price = None
+    if not buybox_price and not jsonld_price:
+        twister = soup.select_one(".twister-plus-buying-options-price-data, [data-twister-buying-options]")
+        if twister:
+            try:
+                import json as _json
+                t_data = _json.loads(twister.get_text())
+                if isinstance(t_data, dict):
+                    asin_opts = t_data.get(asin) or t_data.get("desktop_buybox_group_1")
+                    if isinstance(asin_opts, list) and asin_opts:
+                        pa = asin_opts[0].get("priceAmount")
+                        if pa:
+                            twister_price = float(pa)
+                    elif isinstance(asin_opts, dict):
+                        pa = asin_opts.get("priceAmount")
+                        if pa:
+                            twister_price = float(pa)
+            except Exception:
+                pass
+
+    # Priority 4: AOD (All Offers Display) / Other Buying Options fallback
+    aod_price = None
+    if not buybox_price and not jsonld_price and not twister_price:
+        for aod_sel in [
+            "#aod-ingress-link .a-offscreen",
+            "#all-offers-display .a-offscreen",
+            "#olp_feature_div .a-offscreen",
+            "#dynamic-aod-ingress-box .a-offscreen"
+        ]:
+            aod_elem = soup.select_one(aod_sel)
+            if aod_elem:
+                val = parse_price(aod_elem.get_text())
+                if val and val > 0:
+                    aod_price = val
                     break
 
-            # If offscreen selectors failed, try .a-price elements with combined whole+fraction
-            if not buybox_price:
-                for block in target_blocks:
-                    if not block:
-                        continue
-                    # Find the first non-strikethrough .a-price element
-                    for a_price_el in block.select('.a-price:not(.a-text-price)'):
-                        val = _extract_complete_price_from_element(a_price_el)
-                        if val and val > 0:
-                            buybox_price = val
-                            break
-                    if buybox_price:
-                        break
-
-        # Priority 4: AOD (All Offers Display) — ONLY as fallback if no buybox price
-        # AOD may contain used/renewed/third-party prices, so we don't min() it with buybox.
-        aod_price = None
-        if not buybox_price and not twister_price and not jsonld_price:
-            for aod_sel in [
-                "#aod-ingress-link .a-offscreen",
-                "#all-offers-display .a-offscreen",
-                "#olp_feature_div .a-offscreen",
-                "#dynamic-aod-ingress-box .a-offscreen"
-            ]:
-                aod_elem = soup.select_one(aod_sel)
-                if aod_elem:
-                    val = parse_price(aod_elem.get_text())
-                    if val and val > 0:
-                        aod_price = val
-                        break  # Take first valid, not min — AOD can mix conditions
-
-        # Final price selection: Prefer buybox > twister > JSON-LD > AOD
-        # Buybox/twister are the displayed price; JSON-LD is stable; AOD is last resort
-        if buybox_price and buybox_price > 0:
-            price = buybox_price
-        elif twister_price and twister_price > 0:
-            price = twister_price
-        elif jsonld_price and jsonld_price > 0:
-            price = jsonld_price
-        elif aod_price and aod_price > 0:
-            price = aod_price
+    # Final price selection:
+    if buybox_price and buybox_price > 0:
+        price = buybox_price
+    elif jsonld_price and jsonld_price > 0:
+        price = jsonld_price
+    elif twister_price and twister_price > 0:
+        price = twister_price
+    elif aod_price and aod_price > 0:
+        price = aod_price
 
     # 4. MRP Extraction (Strictly within center_col / main area)
     mrp = custom_mrp
-    if not mrp and center_col:
-        # First try .a-offscreen selectors (complete MRP values)
+    scraped_mrp = None
+    if center_col:
         mrp_offscreen_selectors = [
             ".apex-basisprice-value .a-offscreen",
             ".basisPrice .a-offscreen",
@@ -540,31 +584,40 @@ def scrape_asin_details(
             if elem:
                 extracted = parse_price(elem.get_text())
                 if extracted and extracted > 0:
-                    mrp = extracted
+                    scraped_mrp = extracted
                     break
-        # If offscreen failed, try extracting from .a-text-price elements (strikethrough prices = MRP)
-        if not mrp:
+        if not scraped_mrp:
             for mrp_el in center_col.select('span.a-price.a-text-price'):
                 extracted = _extract_complete_price_from_element(mrp_el)
                 if extracted and extracted > 0:
-                    mrp = extracted
+                    scraped_mrp = extracted
                     break
 
-    # Safeguard MRP: Never overwrite a verified catalog MRP with a ridiculously low fraction
-    existing_mrp = existing.get("mrp") if existing else None
-    if existing_mrp and existing_mrp > 0:
-        if not mrp or mrp < (existing_mrp * 0.25):
-            mrp = existing_mrp
+    # Authoritative Seed Catalog Baseline
+    seed_item = next((p for p in ACER_SEED_PRODUCTS if p["asin"] == asin), None)
+    official_mrp = seed_item.get("mrp") if seed_item else None
+    official_base_price = seed_item.get("base_price") if seed_item else None
+    existing_mrp = official_mrp or (existing.get("mrp") if existing else None)
 
-    # 5. Price Sanity Validation (permit steep Amazon limited-time discounts)
-    baseline_mrp = mrp or existing_mrp
-    if price and baseline_mrp and baseline_mrp > 0:
-        if price > (baseline_mrp * 1.5):
-            logger.warning(f"ASIN {asin}: Scraped price {price} failed sanity check against MRP {baseline_mrp} (>1.5x). Retaining previous price.")
-            price = existing.get("current_price") if existing else baseline_mrp
-        elif price < 40:
-            logger.warning(f"ASIN {asin}: Scraped price {price} < 40 INR. Retaining previous price.")
-            price = existing.get("current_price") if existing else baseline_mrp
+    # Use scraped MRP if valid, otherwise fallback to existing/official MRP
+    if scraped_mrp and scraped_mrp > 0:
+        mrp = scraped_mrp
+    elif existing_mrp and existing_mrp > 0:
+        mrp = existing_mrp
+
+    # If price was found and mrp is less than price, update mrp to at least price
+    if price and mrp and price > mrp:
+        mrp = price
+
+    # If no price was found at all on page, set Out of Stock
+    if price is None:
+        stock_status = "Out of Stock"
+        price = official_base_price or (existing.get("current_price") if existing else mrp)
+
+    # 5. Price Sanity Validation (protect against zero/corrupt scrape < 40 INR)
+    if price and price < 40:
+        logger.warning(f"ASIN {asin}: Scraped price {price} < 40 INR. Retaining previous price.")
+        price = official_base_price or (existing.get("current_price") if existing else mrp)
 
     # 6. Rating and Reviews
     rating = existing.get("rating", 4.2) if existing else 4.2

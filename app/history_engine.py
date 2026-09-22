@@ -125,41 +125,24 @@ def seed_database_if_empty(force: bool = False):
         if cnt > len(ACER_SEED_PRODUCTS) * (HISTORY_MONTHS_COUNT + 1):
             force = True
 
-    # Check if existing products on disk need synchronization (mrp, sort_order, product_group)
-    needs_sync = False
-    if existing_products:
-        seed_map = {p["asin"]: p for p in ACER_SEED_PRODUCTS}
-        for p in existing_products:
-            s = seed_map.get(p["asin"])
-            if s:
-                if abs(p.get("mrp", 0) - s.get("mrp", 0)) > 50:
-                    needs_sync = True
-                    break
-                if p.get("sort_order") != s.get("sort_order"):
-                    needs_sync = True
-                    break
-                if p.get("product_group") != s.get("product_group"):
-                    needs_sync = True
-                    break
-
-    # Ensure authentic product image URLs, sort_orders, product_groups, models, and part_nos are synchronized
+    # Ensure authentic product metadata (mrp, sort_order, product_group, model, part_no, images) are synchronized
     with get_db_connection() as conn:
         cursor = conn.cursor()
         for s in ACER_SEED_PRODUCTS:
             cursor.execute(
                 """
                 UPDATE products 
-                SET sort_order = ?, product_group = ?, model = ?, part_no = ?, image_url = COALESCE(?, image_url)
+                SET mrp = ?, sort_order = ?, product_group = ?, model = ?, part_no = ?, image_url = COALESCE(?, image_url)
                 WHERE asin = ?
                 """,
-                (s["sort_order"], s["product_group"], s.get("model"), s.get("part_no"), s.get("image_url"), s["asin"])
+                (s["mrp"], s["sort_order"], s["product_group"], s.get("model"), s.get("part_no"), s.get("image_url"), s["asin"])
             )
         conn.commit()
 
-    if force or needs_sync or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
+    if force or existing_asins != seed_asins or len(existing_products) != len(ACER_SEED_PRODUCTS):
         clear_all_products_and_history()
     elif existing_products and len(existing_products) >= len(ACER_SEED_PRODUCTS):
-        # Already populated and matching
+        # Already populated and synchronized
         return len(existing_products)
     
     now = now_ist()

@@ -564,7 +564,7 @@ async function triggerDailyPriceCheck() {
   showToast("Scanning Amazon live prices for updates...", "amber");
 
   try {
-    const res = await fetch(`/api/check-prices-daily?group=${currentGroup}&_t=${Date.now()}`, { 
+    const res = await fetch(`/api/check-prices-daily?group=all&_t=${Date.now()}`, { 
       method: "POST",
       cache: "no-store"
     });
@@ -573,11 +573,7 @@ async function triggerDailyPriceCheck() {
     if (data.status === "busy") {
       showToast(data.message || "A scan is already actively in progress. Please wait.", "amber");
     } else if (data.status === "completed") {
-      showToast(data.message || "Live price check completed!", "success");
-      if (data.products && data.products.length > 0) {
-        allProducts = data.products;
-        applyFiltersAndRenderTable();
-      }
+      showToast(data.message || "Live price check completed for entire catalog!", "success");
       await loadDashboardData();
       await fetchNotifications();
       await fetchTabCounts();

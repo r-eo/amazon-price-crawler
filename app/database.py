@@ -157,7 +157,7 @@ def upsert_product(product_data: Dict[str, Any]):
                 mrp = excluded.mrp,
                 current_price = excluded.current_price,
                 stock_status = excluded.stock_status,
-                seller_name = excluded.seller_name,
+                seller_name = COALESCE(excluded.seller_name, products.seller_name),
                 rating = excluded.rating,
                 review_count = excluded.review_count,
                 image_url = excluded.image_url,

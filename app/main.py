@@ -242,7 +242,7 @@ def trigger_daily_price_check(
     Triggers a live crawl check to detect real price changes.
     Protected by crawl lock against concurrent execution under stress tests.
     """
-    target_group = group or GROUP_OTHER_PRODUCTS
+    target_group = group if (group and group in (GROUP_ACER_MONITORS, GROUP_OTHER_PRODUCTS, GROUP_ALL)) else GROUP_ALL
     grp_name = "Acer Accessories" if target_group == GROUP_OTHER_PRODUCTS else ("Acer Monitors" if target_group == GROUP_ACER_MONITORS else "All Products")
     
     if not _crawl_lock.acquire(blocking=False):

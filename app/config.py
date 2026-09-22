@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -83,17 +84,28 @@ EXCEL_MONITORS_FILENAME = "Acer_Monitors_Price_Tracker.xlsx"
 EXCEL_OTHER_FILENAME = "Other_Products_Price_Tracker.xlsx"
 EXCEL_ALL_FILENAME = "All_Products_Price_Tracker.xlsx"
 
-# ScraperAPI Settings (Residential proxy rotation to bypass Amazon bot blocks)
-SCRAPER_API_KEY = (
+# ScraperAPI Settings (Multi-key pool for residential proxy rotation & high concurrency)
+_raw_scraper_keys = (
     os.getenv("SCRAPER_API") or
     os.getenv("SCRAPERAPI_KEY") or
     os.getenv("SCRAPER_API_KEY") or
     ""
 ).strip("\"' \t\r\n")
 
+if _raw_scraper_keys:
+    SCRAPER_API_KEYS = [
+        k.strip("\"' \t\r\n")
+        for k in re.split(r'[,;\n]+', _raw_scraper_keys)
+        if k.strip("\"' \t\r\n")
+    ]
+else:
+    SCRAPER_API_KEYS = []
+
+SCRAPER_API_KEY = SCRAPER_API_KEYS[0] if SCRAPER_API_KEYS else ""
+
 SCRAPERAPI_URL = "https://api.scraperapi.com"
 SCRAPERAPI_COUNTRY = os.getenv("SCRAPERAPI_COUNTRY", "in")
-SCRAPERAPI_TIMEOUT = int(os.getenv("SCRAPERAPI_TIMEOUT", "50"))
+SCRAPERAPI_TIMEOUT = int(os.getenv("SCRAPERAPI_TIMEOUT", "45"))
 
 # Automated Crawl Schedule (IST hours):
 # Default: 10 AM IST daily (conserves API credits for 30 days continuous operation within free tier)
@@ -101,26 +113,36 @@ SCRAPERAPI_TIMEOUT = int(os.getenv("SCRAPERAPI_TIMEOUT", "50"))
 _env_sync_hours = os.getenv("SYNC_HOURS")
 if _env_sync_hours:
     SYNC_INTERVAL_HOURS = [int(h.strip()) for h in _env_sync_hours.split(",") if h.strip().isdigit()]
-elif SCRAPER_API_KEY:
-    SYNC_INTERVAL_HOURS = [10]  # 10:00 AM IST daily (~4,500 credits/mo, safely within 5,000 free tier)
+elif SCRAPER_API_KEYS:
+    SYNC_INTERVAL_HOURS = [10]  # 10:00 AM IST daily (~4,500 credits/mo, safely within pool)
 else:
     SYNC_INTERVAL_HOURS = [9, 11, 13, 15, 17, 19, 21]
 
-# Render Free Tier Memory Optimization (256MB RAM):
-# Limit scraper threads to 2 to prevent RAM spikes from concurrent DOM parsers
-SCRAPER_MAX_WORKERS = 2
+# Concurrency scaling:
+# Each ScraperAPI account has a concurrency limit of 5.
+# With multiple keys, we scale workers (e.g. 2 workers per key up to 8 max workers)
+_env_workers = os.getenv("SCRAPER_MAX_WORKERS")
+if _env_workers and _env_workers.isdigit():
+    SCRAPER_MAX_WORKERS = int(_env_workers)
+elif len(SCRAPER_API_KEYS) >= 4:
+    SCRAPER_MAX_WORKERS = 8  # 4 keys * 2 = 8 parallel workers (well within 5/key limit)
+elif len(SCRAPER_API_KEYS) >= 2:
+    SCRAPER_MAX_WORKERS = len(SCRAPER_API_KEYS) * 2
+else:
+    SCRAPER_MAX_WORKERS = 2
 
 # Approved Authorized Amazon Vendors (Case-insensitive matching)
 # Only offers from these verified vendors are accepted as "In Stock".
 # Unapproved third-party or scalper sellers will be marked "Out of Stock".
 DEFAULT_APPROVED_VENDORS = [
-    "appario retail",
-    "cocoblu retail",
-    "acer official",
-    "acer india",
-    "dawntech electronics",
-    "amazon retail",
-    "amazon.in"
+    "clicktech",
+    "appario",
+    "cocoblu",
+    "dawntech",
+    "darshita",
+    "electronic bazaar",
+    "acer",
+    "amazon",
 ]
 _env_vendors = os.getenv("APPROVED_VENDORS")
 if _env_vendors:
